@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { generateMockData } from '../data/mockData';
 import { EntityType, SourceType } from '../types/osint';
 
 export const OSINTSearchPage = () => {
@@ -16,102 +15,36 @@ export const OSINTSearchPage = () => {
     
     setLoading(true);
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Get mock data
-      const mockData = generateMockData();
-      const mockRelationships = []; // Would be generated based on search results
-      
-      // Filter results based on search type and value
-      const filteredResults: any = {
-        persons: [],
-        phones: [],
-        emails: [],
-        usernames: [],
-        organizations: [],
-        locations: [],
-        cryptoWallets: [],
-        socialAccounts: [],
-        vehicles: [],
-        documents: [],
-      };
+      const startedAt = performance.now();
+      const response = await fetch(
+        `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}`
+      );
 
-      const searchLower = searchValue.toLowerCase().trim();
-
-      // Simple mock filtering - in real app this would be a proper search
-      switch (searchType) {
-        case 'person':
-          filteredResults.persons = mockData.persons.filter(p => 
-            p.value.toLowerCase().includes(searchLower) || 
-            p.aliases.some(a => a.toLowerCase().includes(searchLower))
-          );
-          break;
-        case 'phone':
-          filteredResults.phones = mockData.phones.filter(p => 
-            p.value.includes(searchValue.replace(/\s+/g, '')) // Remove spaces for phone matching
-          );
-          break;
-        case 'email':
-          filteredResults.emails = mockData.emails.filter(e => 
-            e.value.toLowerCase().includes(searchLower)
-          );
-          break;
-        case 'username':
-          filteredResults.usernames = mockData.usernames.filter(u => 
-            u.value.toLowerCase().includes(searchLower)
-          );
-          break;
-        case 'organization':
-          filteredResults.organizations = mockData.organizations.filter(o => 
-            o.value.toLowerCase().includes(searchLower)
-          );
-          break;
-        case 'crypto_wallet':
-          filteredResults.cryptoWallets = mockData.cryptoWallets.filter(w => 
-            w.value.toLowerCase().includes(searchLower.toLowerCase())
-          );
-          break;
-        default:
-          // Search all types
-          filteredResults.persons = mockData.persons.filter(p => 
-            p.value.toLowerCase().includes(searchLower) || 
-            p.aliases.some(a => a.toLowerCase().includes(searchLower))
-          );
-          filteredResults.phones = mockData.phones.filter(p => 
-            p.value.includes(searchValue.replace(/\s+/g, ''))
-          );
-          filteredResults.emails = mockData.emails.filter(e => 
-            e.value.toLowerCase().includes(searchLower)
-          );
-          filteredResults.usernames = mockData.usernames.filter(u => 
-            u.value.toLowerCase().includes(searchLower)
-          );
-          filteredResults.organizations = mockData.organizations.filter(o => 
-            o.value.toLowerCase().includes(searchLower)
-          );
-          filteredResults.cryptoWallets = mockData.cryptoWallets.filter(w => 
-            w.value.toLowerCase().includes(searchLower.toLowerCase())
-          );
-          break;
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Search request failed');
       }
 
-      // Remove empty arrays
-      Object.keys(filteredResults).forEach(key => {
-        if (filteredResults[key as keyof typeof filteredResults].length === 0) {
-          delete filteredResults[key as keyof typeof filteredResults];
-        }
-      });
+      const data = await response.json();
+      const groupedResults = data.results.reduce((groups: Record<string, any[]>, entity: any) => {
+        const groupName = entity.type === 'crypto_wallet'
+          ? 'cryptoWallets'
+          : `${entity.type}s`;
+        groups[groupName] ??= [];
+        groups[groupName].push(entity);
+        return groups;
+      }, {});
 
       setResults({
-        query: { type: searchType, value: searchValue },
-        results: filteredResults,
-        totalCount: Object.values(filteredResults).reduce((sum, arr) => sum + arr.length, 0),
-        executedAt: new Date().toISOString(),
-        executionTimeMs: 1450 + Math.random() * 100
+        query: data.query,
+        results: groupedResults,
+        totalCount: data.totalCount,
+        executedAt: data.executedAt,
+        executionTimeMs: performance.now() - startedAt,
       });
     } catch (error) {
       console.error('Search error:', error);
+      setResults(null);
     } finally {
       setLoading(false);
     }
