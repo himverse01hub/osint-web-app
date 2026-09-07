@@ -68,36 +68,30 @@ async function searchLocations(query: string): Promise<SearchEntity[]> {
   }));
 }
 
-async function searchWikidata(query: string): Promise<SearchEntity[]> {
-  const sparql = `
-    SELECT ?item ?itemLabel ?description WHERE {
-      ?item rdfs:label ?itemLabel.
-      FILTER(LANG(?itemLabel) = "en")
-      FILTER(CONTAINS(LCASE(?itemLabel), LCASE(${JSON.stringify(query)})))
-      OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "en") }
-    }
-    LIMIT 10
-  `;
-
-  const url = new URL('https://query.wikidata.org/sparql');
-  url.searchParams.set('query', sparql);
+async function searchWikidata(query: string, entityType: SearchType): Promise<SearchEntity[]> {
+  const url = new URL('https://www.wikidata.org/w/api.php');
+  url.searchParams.set('action', 'wbsearchentities');
+  url.searchParams.set('search', query);
+  url.searchParams.set('language', 'en');
+  url.searchParams.set('uselang', 'en');
+  url.searchParams.set('limit', '10');
   url.searchParams.set('format', 'json');
   const data = await fetchJson(url.toString(), {
-    headers: { Accept: 'application/sparql-results+json' },
+    headers: { Accept: 'application/json', 'User-Agent': 'HaryanaPoliceOSINT/1.0' },
   });
 
-  return data.results.bindings.map((item: any) => emptyEntity({
-    id: item.item.value,
-    type: 'person',
-    value: item.itemLabel.value,
-    label: item.itemLabel.value,
+  return (data.search ?? []).map((item: any) => emptyEntity({
+    id: `wikidata-${item.id}`,
+    type: entityType === 'organization' ? 'organization' : 'person',
+    value: item.label,
+    label: item.label,
     confidence: 72,
     source: 'public_records',
     sourceName: 'Wikidata',
-    sourceUrl: item.item.value,
+    sourceUrl: `https://www.wikidata.org/wiki/${item.id}`,
     verified: false,
     tags: ['knowledge_graph', 'public_data'],
-    metadata: { description: item.description?.value ?? '' },
+    metadata: { description: item.description ?? '' },
   }));
 }
 
@@ -144,9 +138,19 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const shouldSearchKnowledge = ['person', 'organization', 'username', 'all'].includes(type);
   const jobs: Promise<SearchEntity[]>[] = [];
 
-  if (shouldSearchLocations) jobs.push(searchLocations(value));
-  if (shouldSearchKnowledge) jobs.push(searchWikidata(value));
-  if (shouldSearchNews) jobs.push(searchNews(value));
+  const sourceNames: string[] = [];
+  const sourceErrors: string[] = [];
+  const addJob = (name: string, job: Promise<SearchEntity[]>) => {
+    sourceNames.push(name);
+    jobs.push(job.catch((error) => {
+      sourceErrors.push(`${name}: ${error instanceof Error ? error.message : 'request failed'}`);
+      return [];
+    }));
+  };
+
+  if (shouldSearchLocations) addJob('OpenStreetMap Nominatim', searchLocations(value));
+  if (shouldSearchKnowledge) addJob('Wikidata', searchWikidata(value, type));
+  if (shouldSearchNews) addJob('GDELT', searchNews(value));
 
   const settled = await Promise.allSettled(jobs);
   const results = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
@@ -156,6 +160,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     results,
     totalCount: results.length,
     executedAt: new Date().toISOString(),
-    sources: ['OpenStreetMap Nominatim', 'Wikidata', 'GDELT'],
+    sources: sourceNames,
+    sourceErrors,
   });
 }

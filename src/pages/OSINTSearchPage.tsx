@@ -8,12 +8,14 @@ export const OSINTSearchPage = () => {
   const [searchValue, setSearchValue] = useState('');
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [selectedTab, setSelectedTab] = useState<'entities' | 'relationships'>('entities');
 
   const handleSearch = async () => {
     if (!searchValue.trim()) return;
     
     setLoading(true);
+    setSearchError('');
     try {
       const startedAt = performance.now();
       const response = await fetch(
@@ -41,10 +43,12 @@ export const OSINTSearchPage = () => {
         totalCount: data.totalCount,
         executedAt: data.executedAt,
         executionTimeMs: performance.now() - startedAt,
+        sources: data.sources ?? [],
+        sourceErrors: data.sourceErrors ?? [],
       });
     } catch (error) {
       console.error('Search error:', error);
-      setResults(null);
+      setSearchError(error instanceof Error ? error.message : 'Search request failed');
     } finally {
       setLoading(false);
     }
@@ -136,6 +140,11 @@ export const OSINTSearchPage = () => {
               <p className="text-police-500 text-sm mt-1">
                 Examples: Rahul Sharma, +91-9876543210, rahul.sharma@example.com, TechSolutions Innovations
               </p>
+              {searchError && (
+                <p className="mt-2 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+                  {searchError}
+                </p>
+              )}
             </div>
             <button
               onClick={handleSearch}
@@ -185,6 +194,11 @@ export const OSINTSearchPage = () => {
             Found {results.totalCount} results for "{results.query.value}" 
             ({results.executionTimeMs.toFixed(0)}ms)
           </p>
+          {results.sourceErrors?.length > 0 && (
+            <p className="mt-2 text-xs text-yellow-400">
+              Some sources were unavailable: {results.sourceErrors.join(' | ')}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button 
