@@ -37,7 +37,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         ? database`WHERE severity = ${String(request.query.severity)}`
         : database``;
       const statusFilter = request.query.status && allowedStatuses.has(String(request.query.status))
-        ? (severityFilter ? database`AND status = ${String(request.query.status)}` : database`WHERE status = ${String(request.query.status)}`)
+        ? (Boolean(severityFilter) ? database`AND status = ${String(request.query.status)}` : database`WHERE status = ${String(request.query.status)}`)
         : database``;
       const whereClause = severityFilter || statusFilter;
 

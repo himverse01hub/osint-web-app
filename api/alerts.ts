@@ -69,16 +69,16 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const page = Math.max(1, parseInt(String(request.query.page || '1'), 10));
     const limit = Math.min(100, Math.max(1, parseInt(String(request.query.limit || '50'), 10)));
     const offset = (page - 1) * limit;
-    const severityFilter = request.query.severity && allowedSeverities.has(String(request.query.severity))
+        const severityFilter = request.query.severity && allowedSeverities.has(String(request.query.severity))
       ? database`WHERE severity = ${String(request.query.severity)}`
       : database``;
     const typeFilter = request.query.type
-      ? (severityFilter ? database`AND type = ${String(request.query.type)}` : database`WHERE type = ${String(request.query.type)}`)
+      ? (Boolean(severityFilter) ? database`AND type = ${String(request.query.type)}` : database`WHERE type = ${String(request.query.type)}`)
       : database``;
     const acknowledgedFilter = request.query.acknowledged === 'true'
-      ? (severityFilter || typeFilter ? database`AND acknowledged_at IS NOT NULL` : database`WHERE acknowledged_at IS NOT NULL`)
+      ? (Boolean(severityFilter) || Boolean(typeFilter) ? database`AND acknowledged_at IS NOT NULL` : database`WHERE acknowledged_at IS NOT NULL`)
       : request.query.acknowledged === 'false'
-        ? (severityFilter || typeFilter ? database`AND acknowledged_at IS NULL` : database`WHERE acknowledged_at IS NULL`)
+        ? (Boolean(severityFilter) || Boolean(typeFilter) ? database`AND acknowledged_at IS NULL` : database`WHERE acknowledged_at IS NULL`)
         : database``;
     const whereClause = severityFilter || typeFilter || acknowledgedFilter;
 

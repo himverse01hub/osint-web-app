@@ -89,7 +89,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         ? database`WHERE status = ${String(request.query.status)}`
         : database``;
       const priorityFilter = request.query.priority && allowedPriorities.has(String(request.query.priority))
-        ? (statusFilter ? database`AND priority = ${String(request.query.priority)}` : database`WHERE priority = ${String(request.query.priority)}`)
+        ? (Boolean(statusFilter) ? database`AND priority = ${String(request.query.priority)}` : database`WHERE priority = ${String(request.query.priority)}`)
         : database``;
       const whereClause = statusFilter || priorityFilter;
 
