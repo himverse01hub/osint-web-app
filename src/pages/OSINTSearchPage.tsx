@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EntityType } from '../types/osint';
 import { EntityManager } from '../components/EntityManager';
@@ -18,6 +18,9 @@ export const OSINTSearchPage = () => {
   const [limit, setLimit] = useState(25);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [recentSearches, setRecentSearches] = useState<Array<{query: string; type: string; timestamp: string; count: number}>>([]);
+  const [searchHistory, setSearchHistory] = useState<Array<{query: string; type: string; timestamp: string; count: number}>>([]);
 
   const handleSearch = async (searchPage = 1, searchLimit = limit) => {
     if (!searchValue.trim()) return;
@@ -62,6 +65,20 @@ export const OSINTSearchPage = () => {
       setTotalCount(data.totalCount);
       setPage(data.page);
       setLimit(data.limit);
+      setActiveFilters(new Set());
+
+      const searchEntry = {
+        query: searchValue.trim(),
+        type: searchType,
+        timestamp: new Date().toISOString(),
+        count: data.totalCount,
+      };
+
+      const updated = [searchEntry, ...recentSearches.filter(s => s.query !== searchEntry.query || s.type !== searchEntry.type)].slice(0, 20);
+      setRecentSearches(updated);
+      localStorage.setItem('recentSearches', JSON.stringify(updated));
+
+      void loadSearchHistory();
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search request failed');
@@ -70,9 +87,115 @@ export const OSINTSearchPage = () => {
     }
   };
 
+  const loadSearchHistory = useCallback(async () => {
+    try {
+      const response = await fetch('/api/search-history');
+      if (response.ok) {
+        const data = await response.json();
+        setSearchHistory((data.searches ?? []).map((s: any) => ({
+          query: s.query,
+          type: s.searchType,
+          timestamp: s.timestamp,
+          count: s.resultsCount,
+        })));
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('recentSearches');
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved));
+      } catch {
+        // ignore
+      }
+    }
+    void loadSearchHistory();
+  }, [loadSearchHistory]);
+
+  const applyRecentSearch = (query: string, type: string) => {
+    setSearchValue(query);
+    setSearchType(type as EntityType);
+    void handleSearch(1);
+  };
+
+  const toggleFilter = (filter: string) => {
+    setActiveFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(filter)) {
+        next.delete(filter);
+      } else {
+        next.add(filter);
+      }
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setActiveFilters(new Set());
+  };
+
+  const filteredResults = useMemo(() => {
+    if (!results?.results || activeFilters.size === 0) return results?.results ?? {};
+    const filtered: Record<string, any[]> = {};
+    for (const [type, entities] of Object.entries(results.results)) {
+      if (activeFilters.has(type)) {
+        filtered[type] = entities as any[];
+      }
+    }
+    return filtered;
+  }, [results, activeFilters]);
+
+  const allFilteredEntities = useMemo(() => {
+    return Object.values(filteredResults).flat();
+  }, [filteredResults]);
+
+  const exportCSV = () => {
+    if (!allFilteredEntities.length) return;
+    const headers = ['Type', 'Value', 'Label', 'Confidence', 'Source', 'Discovered At'];
+    const rows = allFilteredEntities.map((e: any) => [
+      e.type,
+      e.value,
+      e.label,
+      e.confidence,
+      e.sourceName,
+      new Date(e.discoveredAt).toLocaleDateString(),
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map((c: string) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+    downloadFile(csv, 'search-results.csv', 'text/csv');
+  };
+
+  const exportJSON = () => {
+    if (!allFilteredEntities.length) return;
+    const blob = new Blob([JSON.stringify(allFilteredEntities, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'search-results.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadFile = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const uniqueTypes = useMemo(() => {
+    if (!results?.results) return [];
+    return Object.keys(results.results);
+  }, [results]);
+
   if (!results) {
     return (
-      <>
       <div className="space-y-6">
         {/* Search Header */}
         <div className="flex items-center justify-between space-x-4">
@@ -111,9 +234,6 @@ export const OSINTSearchPage = () => {
               </select>
             </div>
             <div>
-              <label htmlFor="search-value" className="block text-sm font-medium text-police-300 mb-2">
-                Search Value
-              </label>
               <input
                 id="search-value"
                 type="text"
@@ -141,7 +261,7 @@ export const OSINTSearchPage = () => {
           </div>
         </div>
 
-        {/* Data & Activity Manager Cards */}
+        {/* Data and Activity Manager Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button onClick={() => setPanel('entities')} className="card card-hover p-5 text-left">
             <div className="flex items-center gap-3 mb-2">
@@ -169,6 +289,30 @@ export const OSINTSearchPage = () => {
           </button>
         </div>
 
+        {/* Search History Timeline */}
+        {searchHistory.length > 0 && (
+          <div className="card card-hover p-4">
+            <h3 className="text-lg font-semibold text-white mb-3">Recent Search History</h3>
+            <div className="space-y-2">
+              {searchHistory.slice(0, 5).map((search, idx) => (
+                <button
+                  key={`timeline-${idx}`}
+                  onMouseDown={() => applyRecentSearch(search.query, search.type)}
+                  className="w-full flex items-center justify-between p-2 rounded hover:bg-police-800/50 text-left"
+                >
+                  <div>
+                    <p className="text-sm text-white">{search.query}</p>
+                    <p className="text-xs text-police-500">
+                      {new Date(search.timestamp).toLocaleString()} • {search.count} results
+                    </p>
+                  </div>
+                  <span className="text-xs text-police-400">{search.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Search Tips */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="card card-hover p-4">
@@ -193,48 +337,76 @@ export const OSINTSearchPage = () => {
             </ul>
           </div>
         </div>
-      </div>
 
-      {panel === 'entities' && <EntityManager onClose={() => setPanel(null)} />}
-      {panel === 'activity' && <ActivityManager onClose={() => setPanel(null)} />}
-      </>
+        {panel === 'entities' && <EntityManager onClose={() => setPanel(null)} />}
+        {panel === 'activity' && <ActivityManager onClose={() => setPanel(null)} />}
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Search Header */}
-      <div className="flex items-center justify-between space-x-4">
+<div className="flex items-center justify-between space-x-4">
         <div>
           <h1 className="text-2xl font-bold text-gradient">OSINT Search Results</h1>
           <p className="text-police-400">
             Found {results.totalCount} results for "{results.query.value}" 
             ({results.executionTimeMs.toFixed(0)}ms)
           </p>
-{results.sourceErrors?.length > 0 && (
-          <p className="mt-2 text-xs text-yellow-400">
-            Some sources were unavailable: {results.sourceErrors.join(' | ')}
-          </p>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        <button 
-          onClick={() => {
-            setResults(null);
-            setSearchValue('');
-            setPage(1);
-            setTotalPages(0);
-            setTotalCount(0);
-          }}
-          className="btn-secondary px-4 py-2"
-        >
-          New Search
-        </button>
-          <button className="btn-accent px-4 py-2">
-            Export Results
+          {results.sourceErrors?.length > 0 && (
+            <p className="mt-2 text-xs text-yellow-400">
+              Some sources were unavailable: {results.sourceErrors.join(' | ')}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              setResults(null);
+              setSearchValue('');
+              setPage(1);
+              setTotalPages(0);
+              setTotalCount(0);
+              setActiveFilters(new Set());
+            }}
+            className="btn-secondary px-4 py-2"
+          >
+            New Search
           </button>
+          <button onClick={exportCSV} className="btn-secondary px-4 py-2">
+            Export CSV
+          </button>
+          <button onClick={exportJSON} className="btn-accent px-4 py-2">
+            Export JSON
+            </button>
         </div>
       </div>
+
+      {/* Filter Chips */}
+      {uniqueTypes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-police-400 text-sm">Filters:</span>
+          {uniqueTypes.map(type => (
+            <button
+              key={type}
+              onClick={() => toggleFilter(type)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                activeFilters.has(type)
+                  ? 'bg-accent-cyan text-police-900'
+                  : 'bg-police-800 text-police-300 hover:bg-police-700'
+              }`}
+            >
+              {type.replace('_', ' ')} ({(results.results[type] as any[])?.length || 0})
+            </button>
+          ))}
+          {activeFilters.size > 0 && (
+            <button onClick={clearFilters} className="text-xs text-red-400 hover:text-red-300 ml-2">
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Results Tabs */}
       <div className="flex border-b border-police-700 mb-6">
@@ -262,7 +434,7 @@ export const OSINTSearchPage = () => {
 
       {selectedTab === 'entities' ? (
         <div className="space-y-6">
-          {Object.entries(results.results).map((entry) => {
+          {Object.entries(filteredResults).map((entry) => {
             const [type, entities] = entry as [string, any[]];
             if (entities.length === 0) return null;
             
