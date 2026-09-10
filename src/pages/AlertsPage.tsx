@@ -1,35 +1,60 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { generateMockAlerts } from '../data/mockData';
 import { Alert } from '../types/osint';
+import { Pagination } from '../components/Pagination';
 
 export const AlertsPage = () => {
-  const { authState } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSeverity, setFilterSeverity] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all');
   const [filterType, setFilterType] = useState<'all' | Alert['type']>('all');
   const [acknowledgedFilter, setAcknowledgedFilter] = useState<'all' | 'acknowledged' | 'unacknowledged'>('all');
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState<{ total: number; unacknowledged: number; highRisk: number }>({ total: 0, unacknowledged: 0, highRisk: 0 });
+
+  const loadAlerts = async (loadPage = page, loadLimit = limit) => {
+    setRefreshing(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(loadPage));
+      params.set('limit', String(loadLimit));
+      if (filterSeverity !== 'all') params.set('severity', filterSeverity);
+      if (filterType !== 'all') params.set('type', filterType);
+      if (acknowledgedFilter === 'acknowledged') params.set('acknowledged', 'true');
+      if (acknowledgedFilter === 'unacknowledged') params.set('acknowledged', 'false');
+      
+      const response = await fetch(`/api/alerts?${params.toString()}`);
+      if (!response.ok) throw new Error('Alerts request failed');
+      const data = await response.json();
+      setAlerts(data.alerts ?? []);
+      setTotalPages(data.totalPages || 1);
+      setTotalCount(data.total || 0);
+      setPage(loadPage);
+      setLimit(loadLimit);
+      if (data.stats) setStats(data.stats);
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const loadAlerts = async () => {
-      setLoading(true);
-      try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Get mock data
-        const mockAlerts = generateMockAlerts();
-        setAlerts(mockAlerts);
-      } catch (error) {
-        console.error('Error loading alerts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    void loadAlerts(1, limit);
+  }, [filterSeverity, filterType, acknowledgedFilter]);
 
-    loadAlerts();
-  }, []);
+  useEffect(() => {
+    void loadAlerts();
+  }, [loadAlerts]);
+
+  const acknowledgeAlert = async (id: string) => {
+    const response = await fetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
+    if (response.ok) void loadAlerts();
+  };
 
   const filteredAlerts = alerts.filter(alert => {
     const severityMatch = filterSeverity === 'all' || alert.severity === filterSeverity;
@@ -75,16 +100,16 @@ export const AlertsPage = () => {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => {
-              // Refresh alerts
-            }}
+            onClick={() => void loadAlerts()}
+            disabled={refreshing}
             className="btn-secondary px-4 py-2"
           >
-            Refresh
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
           <button 
             onClick={() => {
-              // Acknowledge selected
+              const firstUnacknowledged = filteredAlerts.find(alert => !alert.acknowledgedAt);
+              if (firstUnacknowledged) void acknowledgeAlert(firstUnacknowledged.id);
             }}
             className="btn-accent px-4 py-2"
           >
@@ -147,7 +172,18 @@ export const AlertsPage = () => {
 
       {/* Alerts List */}
       <div className="space-y-4">
-        {filteredAlerts.length > 0 ? (
+        {loading && (
+          <div className="text-center text-police-500 py-8">
+            <p>Loading alerts...</p>
+          </div>
+        )}
+        {!loading && filteredAlerts.length === 0 && (
+          <div className="text-center text-police-500 py-8">
+            <p>No alerts match the current filters.</p>
+            <p className="mt-2 text-sm">Try adjusting the filters to view more alerts.</p>
+          </div>
+        )}
+        {!loading && filteredAlerts.length > 0 && (
           filteredAlerts.map((alert) => (
             <div key={alert.id} className="card card-hover p-4">
               <div className="flex items-start gap-4">
@@ -171,6 +207,11 @@ export const AlertsPage = () => {
                     </div>
                   </div>
                   <p className="text-police-400 text-sm">{alert.description}</p>
+                  {!alert.acknowledgedAt && (
+                    <button onClick={() => void acknowledgeAlert(alert.id)} className="mt-3 text-sm text-accent-cyan hover:underline">
+                      Acknowledge alert
+                    </button>
+                  )}
                   <div className="flex items-center gap-4 mt-2 text-police-400 text-sm">
                     <span>
                       <strong>Entity:</strong> 
@@ -221,47 +262,47 @@ export const AlertsPage = () => {
                 </div>
               </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center text-police-500 py-8">
-            <p>No alerts match the current filters.</p>
-            <p className="mt-2 text-sm">Try adjusting the filters to view more alerts.</p>
-          </div>
+            )))}
+        </div>
+
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            limit={limit}
+            onPageChange={(newPage) => { void loadAlerts(newPage); }}
+            onLimitChange={(newLimit) => { void loadAlerts(1, newLimit); }}
+          />
         )}
-      </div>
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card card-hover p-4">
           <h3 className="text-lg font-semibold text-white mb-3">Total Alerts</h3>
-          <p className="text-2xl font-bold text-accent-cyan">{alerts.length}</p>
+          <p className="text-2xl font-bold text-accent-cyan">{stats.total}</p>
           <p className="text-police-400 text-sm">All Time</p>
         </div>
         <div className="card card-hover p-4">
           <h3 className="text-lg font-semibold text-white mb-3">Unacknowledged</h3>
           <p className="text-2xl font-bold text-accent-cyan">
-            {alerts.filter(a => a.acknowledgedAt === undefined).length}
+            {stats.unacknowledged}
           </p>
           <p className="text-police-400 text-sm">Pending</p>
         </div>
         <div className="card card-hover p-4">
           <h3 className="text-lg font-semibold text-white mb-3">High Priority</h3>
           <p className="text-2xl font-bold text-accent-cyan">
-            {alerts.filter(a => a.severity === 'high' || a.severity === 'critical').length}
+            {stats.highRisk}
           </p>
           <p className="text-police-400 text-sm">Severity</p>
         </div>
         <div className="card card-hover p-4">
-          <h3 className="text-lg font-semibold text-white mb-3">Today</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">Filtered View</h3>
           <p className="text-2xl font-bold text-accent-cyan">
-            {/* Count alerts from today */}
-            {alerts.filter(a => {
-              const today = new Date();
-              const alertDate = new Date(a.createdAt);
-              return alertDate.toDateString() === today.toDateString();
-            }).length}
+            {filteredAlerts.length}
           </p>
-          <p className="text-police-400 text-sm">Last 24h</p>
+          <p className="text-police-400 text-sm">On this page</p>
         </div>
       </div>
     </div>

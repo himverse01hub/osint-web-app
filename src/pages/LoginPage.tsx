@@ -5,8 +5,9 @@ import { useNavigate } from 'react-router-dom';
 export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +16,7 @@ export const LoginPage = () => {
     setLoading(true);
     setError(null);
     try {
-      await login({ email, password });
+      await login({ username, password });
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -38,50 +39,55 @@ export const LoginPage = () => {
         </div>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-police-300 mb-2">
-              Email Address
+            <label htmlFor="username" className="block text-sm font-medium text-police-300 mb-2">
+              Username
             </label>
             <input
-              id="email"
-              type="email"
+              id="username"
+              type="text"
               required
+              autoComplete="username"
               className="input-field w-full"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your official email"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-police-300 mb-2">
+            <label htmlFor="login-password" className="block text-sm font-medium text-police-300 mb-2">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              required
-              className="input-field w-full"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="relative">
               <input
-                id="remember"
-                type="checkbox"
-                className="h-4 w-4 text-accent-cyan focus:ring-police-500 border-police-600 rounded"
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                className="input-field w-full pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
               />
-              <label htmlFor="remember" className="ml-2 text-sm text-police-400">
-                Remember me
-              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-police-400 hover:text-police-300"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <line x1="3" y1="3" x2="21" y2="21"></line>
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                )}
+              </button>
             </div>
-            <button
-              type="button"
-              className="text-sm text-police-400 hover:text-police-300"
-            >
-              Forgot Password?
-            </button>
           </div>
           <button
             type="submit"
@@ -101,7 +107,7 @@ export const LoginPage = () => {
             This is a secured system. Access is restricted to authorised personnel only.
           </p>
           <p className="mt-1">
-            All activities are monitored and logged for audit purposes.
+            Login credentials are set from Settings → Account. All activities are monitored and logged.
           </p>
         </div>
       </div>
@@ -110,4 +116,3 @@ export const LoginPage = () => {
 };
 
 export default LoginPage;
-

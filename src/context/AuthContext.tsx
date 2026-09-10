@@ -1,14 +1,17 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import { User, AuthState } from '../types/auth'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { AuthState } from '../types/auth';
 
 const AuthContext = createContext<{
   authState: AuthState
-  login: (credentials: { email: string; password: string }) => Promise<void>
-  logout: () => void
+  login: (credentials: { username: string; password: string }) => Promise<void>
+  logout: () => Promise<void>
+  reloadUser: () => Promise<void>
 }>({
   authState: { user: null, isAuthenticated: false, isLoading: true },
   login: async () => {},
-  logout: () => {},
+  logout: async () => {},
+  reloadUser: async () => {},
 })
 
 export const useAuth = () => {
@@ -19,127 +22,89 @@ export const useAuth = () => {
   return context
 }
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
     isLoading: true,
   })
 
-  useEffect(() => {
-    // Simulate checking auth status (in real app, this would check token/session)
-    const checkAuth = async () => {
-      try {
-        // Simulate delay
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Mock user data for demo
-        const mockUser: User = {
-          id: 'user_001',
-          name: 'Inspector Vikram Singh',
-          email: 'vikram.singh@haryanapolice.gov.in',
-          badgeNumber: 'HP-2024-0087',
-          role: 'investigator',
-          department: 'Criminal Investigation Department',
-          rank: 'Inspector',
-          avatar: 'https://ui-avatars.com/api/?name=Vikram+Singh&background=0d1e33&color=00d4ff',
-          lastLogin: new Date().toISOString(),
-          permissions: [
-            'dashboard.view',
-            'search.execute',
-            'profile.view',
-            'profile.edit',
-            'graph.view',
-            'darkweb.view',
-            'reports.generate',
-            'reports.export',
-            'alerts.view',
-            'audit.view',
-          ],
-        }
-        
-        setAuthState({
-          user: mockUser,
-          isAuthenticated: true,
-          isLoading: false,
-        })
-      } catch (error) {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-        })
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'same-origin' })
+      if (!response.ok) {
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false })
+        return
       }
+      const data = await response.json()
+      setAuthState({ user: data.user ?? null, isAuthenticated: Boolean(data.user), isLoading: false })
+    } catch (error) {
+      console.error('Error checking auth status:', error)
+      setAuthState({ user: null, isAuthenticated: false, isLoading: false })
     }
-    
-    checkAuth()
   }, [])
 
-  const login = async (credentials: { email: string; password: string }) => {
+  useEffect(() => {
+    void checkAuth()
+  }, [checkAuth])
+
+  const login = async (credentials: { username: string; password: string }) => {
     setAuthState(prev => ({ ...prev, isLoading: true }))
-    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Simple mock validation
-      if (credentials.email && credentials.password) {
-        const mockUser: User = {
-          id: 'user_001',
-          name: 'Inspector Vikram Singh',
-          email: credentials.email,
-          badgeNumber: 'HP-2024-0087',
-          role: 'investigator',
-          department: 'Criminal Investigation Department',
-          rank: 'Inspector',
-          avatar: 'https://ui-avatars.com/api/?name=Vikram+Singh&background=0d1e33&color=00d4ff',
-          lastLogin: new Date().toISOString(),
-          permissions: [
-            'dashboard.view',
-            'search.execute',
-            'profile.view',
-            'profile.edit',
-            'graph.view',
-            'darkweb.view',
-            'reports.generate',
-            'reports.export',
-            'alerts.view',
-            'audit.view',
-          ],
-        }
-        
-        setAuthState({
-          user: mockUser,
-          isAuthenticated: true,
-          isLoading: false,
-        })
-      } else {
-        throw new Error('Invalid credentials')
-      }
-    } catch (error) {
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
       })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed')
+      }
+      setAuthState({ user: data.user ?? null, isAuthenticated: Boolean(data.user), isLoading: false })
+    } catch (error) {
+      setAuthState({ user: null, isAuthenticated: false, isLoading: false })
       throw error
     }
   }
 
-  const logout = () => {
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    })
+  const reloadUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'same-origin' })
+      if (!response.ok) {
+        return
+      }
+      const data = await response.json()
+      setAuthState({ user: data.user ?? null, isAuthenticated: Boolean(data.user), isLoading: false })
+    } catch (error) {
+      console.error('Error reloading user:', error)
+    }
+  }, [])
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    } catch (error) {
+      console.error('Error during logout:', error)
+    }
+    setAuthState({ user: null, isAuthenticated: false, isLoading: false })
   }
 
   if (authState.isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return <div className="flex items-center justify-center min-h-screen bg-police-950">
+      <div className="text-center">
+        <div className="mx-auto h-12 w-12">
+          <svg className="h-12 w-12 text-accent-cyan animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </div>
+        <p className="mt-4 text-police-400">Loading secure session...</p>
+      </div>
+    </div>
   }
 
   return (
-    <AuthContext.Provider value={{ authState, login, logout }}>
+    <AuthContext.Provider value={{ authState, login, logout, reloadUser }}>
       {children}
     </AuthContext.Provider>
   )

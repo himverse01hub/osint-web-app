@@ -2,7 +2,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username?: string;
   badgeNumber: string;
+  phone?: string;
   role: 'admin' | 'investigator' | 'analyst' | 'supervisor';
   department: string;
   rank: string;

@@ -9,22 +9,33 @@ export const AIAssistantPage = () => {
   const [suggestedQueries, setSuggestedQueries] = useState<string[]>([]);
 
   useEffect(() => {
-    // Set up suggested queries based on common investigations
     setSuggestedQueries([
-      "Find accounts linked to this phone number.",
-      "Show connections between these two persons.",
-      "Summarise the online activity of this suspect.",
+      "What is connected to this entity?",
+      "Show relationships for this subject.",
+      "Summarise the recorded activity for this suspect.",
       "What cryptocurrency wallets are associated with this person?",
       "Show me all social media profiles for this username.",
       "What organizations is this person connected to?",
-      "Find recent locations visited by this suspect.",
+      "Find recent locations for this subject.",
       "Are there any dark web mentions for this email?",
       "Show the relationship network for this organization.",
       "What documents are associated with this person?"
     ]);
   }, []);
 
-  const handleContextChange = (entity: any) => {
+  const handleContextChange = async (entity: any) => {
+    if (entity?.id && !entity?.label) {
+      try {
+        const response = await fetch(`/api/entities?id=${encodeURIComponent(entity.id)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setContextEntity(data.entity);
+          return;
+        }
+      } catch {
+        // fall through and set the partial entity
+      }
+    }
     setContextEntity(entity);
   };
 
@@ -75,9 +86,9 @@ export const AIAssistantPage = () => {
             <p className="text-police-400 text-sm">
               {contextEntity.type === 'person' && (
                 <>
-                  {contextEntity.aliases.length > 0 && (
+                  {(contextEntity.aliases ?? []).length > 0 && (
                     <span className="bg-police-900/50 px-2 py-0.5 rounded text-xs ml-2">
-                      AKA: {contextEntity.aliases.join(', ')}
+                      AKA: {(contextEntity.aliases ?? []).join(', ')}
                     </span>
                   )}
                 </>
@@ -109,17 +120,17 @@ export const AIAssistantPage = () => {
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Person Investigations</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• "Find all phone numbers associated with Rahul Sharma"</li>
-              <li>• "Show me Priya Patel's social media profiles"</li>
+              <li>• "Find all phone numbers associated with this person"</li>
+              <li>• "Show me this suspect's social media profiles"</li>
               <li>• "What organizations is this person connected to?"</li>
-              <li>• "Show cryptocurrency wallet transactions"</li>
+              <li>• "Show cryptocurrency wallet activity"</li>
             </ul>
           </div>
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Network Analysis</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• "Show connections between these two persons"</li>
-              <li>• "Map the relationship network for TechSolutions"</li>
+              <li>• "Show connections between these two entities"</li>
+              <li>• "Map the relationship network for this organization"</li>
               <li>• "Find common contacts between these entities"</li>
               <li>• "What is the strength of this relationship?"</li>
             </ul>

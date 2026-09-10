@@ -22,6 +22,19 @@ body {
   background: linear-gradient(180deg, #0d1e33 0%, #102a43 50%, #0d1e33 100%);
 }
 
+html[data-theme='light'] body {
+  background: linear-gradient(180deg, #f4f8fb 0%, #e7eef5 50%, #f4f8fb 100%);
+  color: #1e293b;
+}
+
+html[data-theme='light'] .bg-police-950 { background-color: #f4f8fb !important; }
+html[data-theme='light'] .bg-police-900 { background-color: #ffffff !important; }
+html[data-theme='light'] .bg-police-800 { background-color: #e7eef5 !important; }
+html[data-theme='light'] .text-white { color: #172033 !important; }
+html[data-theme='light'] .text-police-300,
+html[data-theme='light'] .text-police-400 { color: #526579 !important; }
+html[data-theme='light'] .text-police-500 { color: #71849a !important; }
+
 #root {
   min-height: 100vh;
 }

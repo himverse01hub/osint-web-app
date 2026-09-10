@@ -244,6 +244,17 @@ export interface AuditLog {
   status: 'success' | 'failure';
 }
 
+export interface CaseFile {
+  id: string;
+  caseId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy?: string;
+  createdAt: string;
+  data?: string;
+}
+
 export interface InvestigationCase {
   id: string;
   caseNumber: string;
@@ -256,6 +267,12 @@ export interface InvestigationCase {
   updatedAt: string;
   entities: string[];
   tags: string[];
+  files?: CaseFile[];
+  coAccused?: string[];
+  phone?: string;
+  email?: string;
+  address?: string;
+  anyId?: string;
 }
 
 export interface Report {
@@ -347,4 +364,9 @@ export interface ChartDataset {
   backgroundColor?: string | string[];
   borderColor?: string | string[];
   borderWidth?: number;
+  coAccused?: string[];
+  phone?: string;
+  email?: string;
+  address?: string;
+  anyId?: string;
 }

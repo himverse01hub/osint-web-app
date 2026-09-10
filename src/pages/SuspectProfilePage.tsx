@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { generateMockData, generateMockRelationships } from '../data/mockData';
 
 export const SuspectProfilePage = () => {
   const { entityId } = useParams<{ entityId: string }>();
-  const { authState } = useAuth();
   const navigate = useNavigate();
   const [entity, setEntity] = useState<any>(null);
   const [relationships, setRelationships] = useState<any[]>([]);
@@ -21,38 +18,11 @@ export const SuspectProfilePage = () => {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        const mockData = generateMockData();
-        const mockRelationships = generateMockRelationships(mockData);
-
-        let foundEntity: any = null;
-        const entityTypes = [
-          mockData.persons,
-          mockData.phones,
-          mockData.emails,
-          mockData.usernames,
-          mockData.organizations,
-          mockData.locations,
-          mockData.cryptoWallets,
-          mockData.socialAccounts,
-          mockData.vehicles,
-          mockData.documents,
-        ];
-
-        for (const entities of entityTypes) {
-          foundEntity = entities.find((e: any) => e.id === entityId);
-          if (foundEntity) break;
-        }
-
-        if (foundEntity) {
-          setEntity(foundEntity);
-          const entityRelationships = mockRelationships.filter(
-            (rel: any) => rel.sourceId === entityId || rel.targetId === entityId
-          );
-          setRelationships(entityRelationships);
-        } else {
-          navigate('/search');
-        }
+        const response = await fetch(`/api/entities?id=${encodeURIComponent(entityId)}`);
+        if (!response.ok) throw new Error('Entity profile request failed');
+        const data = await response.json();
+        setEntity(data.entity);
+        setRelationships(data.relationships ?? []);
       } catch (error) {
         console.error('Error loading profile:', error);
         navigate('/search');

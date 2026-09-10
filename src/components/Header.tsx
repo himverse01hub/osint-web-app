@@ -17,14 +17,13 @@ export const Header = ({ user }: { user: any }) => {
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
-            <button className="flex items-center gap-2 text-police-300 hover:text-white transition-colors">
+            <Link to="/alerts" className="flex items-center gap-2 text-police-300 hover:text-white transition-colors" aria-label="Open notifications">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
               <span className="hidden md:inline">Notifications</span>
-            </button>
-            <div className="absolute -top-2 -right-2 w-3 h-3 bg-red-500 rounded-full"></div>
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <img 

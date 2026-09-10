@@ -11,7 +11,9 @@ import IntelligenceReportPage from './pages/IntelligenceReportPage';
 import AlertsPage from './pages/AlertsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import SettingsPage from './pages/SettingsPage';
-import { WarningBanner } from './components/WarningBanner';
+import CasesPage from './pages/CasesPage';
+import CaseDetailPage from './pages/CaseDetailPage';
+import EntityActivitiesPage from './pages/EntityActivitiesPage';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 
@@ -41,7 +43,6 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-police-950">
-      <WarningBanner />
       <Header user={user} />
       <div className="flex-1 flex">
         <Sidebar />
@@ -50,7 +51,11 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate replace to="/dashboard" />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/cases" element={<CasesPage />} />
+              <Route path="/entity-activities" element={<EntityActivitiesPage />} />
+              <Route path="/case/:caseId" element={<CaseDetailPage />} />
               <Route path="/search" element={<OSINTSearchPage />} />
+              <Route path="/profile" element={<OSINTSearchPage />} />
               <Route path="/profile/:entityId" element={<SuspectProfilePage />} />
               <Route path="/assistant" element={<AIAssistantPage />} />
               <Route path="/graph" element={<KnowledgeGraphPage />} />
@@ -59,6 +64,7 @@ function App() {
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/audit" element={<AuditLogsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/data-management" element={<SettingsPage mode="data" />} />
               <Route path="*" element={<Navigate replace to="/dashboard" />} />
             </Routes>
           </main>

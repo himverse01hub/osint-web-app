@@ -91,6 +91,16 @@ npm run dev
 npm run build
 ```
 
+## Neon Database Setup
+
+1. Create a project at [Neon](https://neon.tech) and copy its pooled PostgreSQL connection string.
+2. Run `db/schema.sql` in the Neon SQL Editor.
+3. Add the connection string to Vercel as `DATABASE_URL` for Production, Preview, and Development.
+4. Redeploy the project.
+5. Verify the connection at `/api/health`. A successful response contains `"database":"connected"`.
+
+The database foundation includes users, cases, entities, relationships, alerts, search history, and audit logs. The current UI still uses demo data for most pages; future API routes will migrate those pages to these tables incrementally.
+
 ## Demo Login Credentials
 - Email: vikram.singh@haryanapolice.gov.in
 - Password: (any password will work for demo)

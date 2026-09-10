@@ -1,25 +1,34 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { EntityType, SourceType } from '../types/osint';
+import { useNavigate } from 'react-router-dom';
+import { EntityType } from '../types/osint';
+import { EntityManager } from '../components/EntityManager';
+import { ActivityManager } from '../components/ActivityManager';
+import { Pagination } from '../components/Pagination';
 
 export const OSINTSearchPage = () => {
-  const { authState } = useAuth();
+  const navigate = useNavigate();
   const [searchType, setSearchType] = useState<EntityType>('person');
   const [searchValue, setSearchValue] = useState('');
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [selectedTab, setSelectedTab] = useState<'entities' | 'relationships'>('entities');
+  const [panel, setPanel] = useState<'entities' | 'activity' | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const handleSearch = async () => {
+  const handleSearch = async (searchPage = 1, searchLimit = limit) => {
     if (!searchValue.trim()) return;
     
+    setPage(searchPage);
     setLoading(true);
     setSearchError('');
     try {
       const startedAt = performance.now();
       const response = await fetch(
-        `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}`
+        `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}&page=${searchPage}&limit=${searchLimit}`
       );
 
       if (!response.ok) {
@@ -41,11 +50,18 @@ export const OSINTSearchPage = () => {
         query: data.query,
         results: groupedResults,
         totalCount: data.totalCount,
+        totalPages: data.totalPages,
+        page: data.page,
+        limit: data.limit,
         executedAt: data.executedAt,
         executionTimeMs: performance.now() - startedAt,
         sources: data.sources ?? [],
         sourceErrors: data.sourceErrors ?? [],
       });
+      setTotalPages(data.totalPages);
+      setTotalCount(data.totalCount);
+      setPage(data.page);
+      setLimit(data.limit);
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search request failed');
@@ -54,40 +70,9 @@ export const OSINTSearchPage = () => {
     }
   };
 
-  const getResultIcon = (type: EntityType) => {
-    switch (type) {
-      case 'person': return 'users';
-      case 'phone': return 'phone';
-      case 'email': return 'mail';
-      case 'username': return 'at-sign';
-      case 'organization': return 'building';
-      case 'location': return 'map-pin';
-      case 'crypto_wallet': return 'credit-card';
-      case 'social_account': return 'message-circle';
-      case 'vehicle': return 'truck';
-      case 'document': return 'file-text';
-      default: return 'search';
-    }
-  };
-
-  const getResultColor = (type: EntityType) => {
-    switch (type) {
-      case 'person': return 'text-accent-cyan';
-      case 'phone': return 'text-green-400';
-      case 'email': return 'text-blue-400';
-      case 'username': return 'text-yellow-400';
-      case 'organization': return 'text-indigo-400';
-      case 'location': return 'text-rose-400';
-      case 'crypto_wallet': return 'text-orange-400';
-      case 'social_account': return 'text-violet-400';
-      case 'vehicle': return 'text-emerald-400';
-      case 'document': return 'text-gray-400';
-      default: return 'text-police-400';
-    }
-  };
-
   if (!results) {
     return (
+      <>
       <div className="space-y-6">
         {/* Search Header */}
         <div className="flex items-center justify-between space-x-4">
@@ -147,13 +132,41 @@ export const OSINTSearchPage = () => {
               )}
             </div>
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch(1)}
               className="btn-primary w-full"
               disabled={loading || !searchValue.trim()}
             >
               {loading ? 'Searching...' : 'Search Intelligence'}
             </button>
           </div>
+        </div>
+
+        {/* Data & Activity Manager Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button onClick={() => setPanel('entities')} className="card card-hover p-5 text-left">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-accent-cyan/10">
+                <svg className="h-6 w-6 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white">Entities</h3>
+            </div>
+            <p className="text-sm text-police-400">View all discovered entities. Add new ones, edit or delete existing records.</p>
+            <p className="mt-3 text-sm font-medium text-accent-cyan">Open Entity Manager →</p>
+          </button>
+          <button onClick={() => setPanel('activity')} className="card card-hover p-5 text-left">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-accent-cyan/10">
+                <svg className="h-6 w-6 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white">Activity</h3>
+            </div>
+            <p className="text-sm text-police-400">Tracking of system activity. Acknowledge alerts or create new ones.</p>
+            <p className="mt-3 text-sm font-medium text-accent-cyan">Open Activity Log →</p>
+          </button>
         </div>
 
         {/* Search Tips */}
@@ -174,13 +187,17 @@ export const OSINTSearchPage = () => {
               <li>• Social Media Platforms</li>
               <li>• Public Records & Databases</li>
               <li>• News & Publications</li>
-              <li>• Dark Web Monitoring (Simulated)</li>
+              <li>• Dark Web Mentions (Lawful Recording)</li>
               <li>• Financial & Blockchain Data</li>
               <li>• Corporate Registries</li>
             </ul>
           </div>
         </div>
       </div>
+
+      {panel === 'entities' && <EntityManager onClose={() => setPanel(null)} />}
+      {panel === 'activity' && <ActivityManager onClose={() => setPanel(null)} />}
+      </>
     );
   }
 
@@ -194,22 +211,25 @@ export const OSINTSearchPage = () => {
             Found {results.totalCount} results for "{results.query.value}" 
             ({results.executionTimeMs.toFixed(0)}ms)
           </p>
-          {results.sourceErrors?.length > 0 && (
-            <p className="mt-2 text-xs text-yellow-400">
-              Some sources were unavailable: {results.sourceErrors.join(' | ')}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => {
-              setResults(null);
-              setSearchValue('');
-            }}
-            className="btn-secondary px-4 py-2"
-          >
-            New Search
-          </button>
+{results.sourceErrors?.length > 0 && (
+          <p className="mt-2 text-xs text-yellow-400">
+            Some sources were unavailable: {results.sourceErrors.join(' | ')}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={() => {
+            setResults(null);
+            setSearchValue('');
+            setPage(1);
+            setTotalPages(0);
+            setTotalCount(0);
+          }}
+          className="btn-secondary px-4 py-2"
+        >
+          New Search
+        </button>
           <button className="btn-accent px-4 py-2">
             Export Results
           </button>
@@ -242,10 +262,9 @@ export const OSINTSearchPage = () => {
 
       {selectedTab === 'entities' ? (
         <div className="space-y-6">
-          {Object.entries(results.results).map(([type, entities]) => {
+          {Object.entries(results.results).map((entry) => {
+            const [type, entities] = entry as [string, any[]];
             if (entities.length === 0) return null;
-            
-            const entityType = type as EntityType;
             
             return (
               <div key={type} className="space-y-4">
@@ -257,10 +276,7 @@ export const OSINTSearchPage = () => {
                   <button 
                     className="text-sm text-police-400 hover:text-police-300"
                   onClick={() => {
-                      // Would navigate to first entity of this type
-                      if (entities.length > 0) {
-                          console.log('Navigate to:', entities[0].id);
-                      }
+                      navigate('/graph');
                     }}
                   >
                     View All
@@ -272,8 +288,7 @@ export const OSINTSearchPage = () => {
                       key={entity.id} 
                       className="flex items-start gap-4 p-4 bg-police-800/50 rounded-lg hover:bg-police-800 transition-colors cursor-pointer"
                       onClick={() => {
-                          // Navigate to entity profile
-                          console.log('View profile for:', entity.id, entity.type);
+                          navigate(`/profile/${encodeURIComponent(entity.id)}`);
                       }}
                     >
                       <div className="flex-shrink-0">
@@ -313,7 +328,7 @@ export const OSINTSearchPage = () => {
                         {entity.type === 'person' && (
                           <div className="mt-2 space-y-1 text-police-400 text-sm">
                             <div className="flex flex-wrap gap-2">
-                              {entity.aliases.slice(0, 3).map((alias: string) => (
+                              {(entity.aliases ?? []).slice(0, 3).map((alias: string) => (
                                 <span key={alias} className="bg-police-900/50 px-2 py-0.5 rounded text-xs">
                                   {alias}
                                 </span>
@@ -350,7 +365,7 @@ export const OSINTSearchPage = () => {
                       </div>
                       <div className="flex-shrink-0 text-right">
                         <div className="text-police-500 text-xs">
-                          {entity.type === 'person' && (
+                          {entity.type === 'person' && entity.riskScore !== undefined && (
                             <span className={`px-2 py-0.5 rounded-full text-xs
                               ${entity.riskScore >= 70 ? 'bg-red-500/20 text-red-300' :
                               entity.riskScore >= 50 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-green-500/20 text-green-300'}
@@ -376,11 +391,28 @@ export const OSINTSearchPage = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-white mb-4">Relationship Network</h3>
           <p className="text-police-400 text-center py-8">
-            Relationship visualization would appear here in the full implementation.
+            Relationship analysis for this search is available in the Knowledge Graph section.
             <br />
-            For demo purposes, please visit the Knowledge Graph section.
+            Search results are saved to the database and linked entities appear in the graph.
           </p>
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          limit={limit}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+            void handleSearch(newPage);
+          }}
+          onLimitChange={(newLimit) => {
+            void handleSearch(1, newLimit);
+          }}
+          showPageSizeSelector
+        />
       )}
     </div>
   );

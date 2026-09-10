@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { generateMockData, generateMockRelationships, generateMockAlerts, generateMockCases } from '../data/mockData';
-import { Person, Phone, Email, Username, Organization, Location, CryptoWallet, SocialAccount, Vehicle, Document, Relationship, Alert } from '../types/osint';
 
 export const DashboardPage = () => {
+  const navigate = useNavigate();
   const { authState } = useAuth();
   const { user } = authState;
   const [stats, setStats] = useState({
@@ -19,284 +19,111 @@ export const DashboardPage = () => {
     totalDocuments: 0,
     totalRelationships: 0,
     activeCases: 0,
+    totalCases: 0,
     totalAlerts: 0,
     highPriorityAlerts: 0,
   });
   const [recentSearches, setRecentSearches] = useState<Array<{id: string; query: string; timestamp: string; resultsCount: number}>>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [cases, setCases] = useState<Array<{id: string; caseNumber: string; title: string; status: string; priority: string; assignedTo: string; updatedAt: string}>>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    // Generate mock data
-    const mockData = generateMockData();
-    const relationships = generateMockRelationships(mockData);
-    const mockAlerts = generateMockAlerts();
-    const mockCases = generateMockCases();
+    let disposed = false;
 
-    // Flatten entities for counting
-    const entities = {
-      persons: mockData.persons,
-      phones: mockData.phones,
-      emails: mockData.emails,
-      usernames: mockData.usernames,
-      organizations: mockData.organizations,
-      locations: mockData.locations,
-      cryptoWallets: mockData.cryptoWallets,
-      socialAccounts: mockData.socialAccounts,
-      vehicles: mockData.vehicles,
-      documents: mockData.documents,
+    const loadLiveDashboard = async () => {
+      if (disposed) return;
+      setRefreshing(true);
+
+      try {
+        const [statsResponse, searchesResponse, casesResponse, entitiesResponse] = await Promise.all([
+          fetch('/api/dashboard'),
+          fetch('/api/search-history'),
+          fetch('/api/cases'),
+          fetch('/api/entities'),
+        ]);
+
+        if (!statsResponse.ok || !searchesResponse.ok || !casesResponse.ok || !entitiesResponse.ok) {
+          throw new Error('One or more live dashboard requests failed');
+        }
+
+        const [statsData, searchesData, casesData, entitiesData] = await Promise.all([
+          statsResponse.json(),
+          searchesResponse.json(),
+          casesResponse.json(),
+          entitiesResponse.json(),
+        ]);
+
+        if (disposed) return;
+        setStats(prev => ({ ...prev, ...statsData.stats }));
+        setRecentSearches((searchesData.searches ?? []).slice(0, 3));
+        setCases(casesData.cases ?? []);
+        setLastSyncedAt(new Date().toISOString());
+      } catch (error) {
+        if (!disposed) console.error('Live dashboard refresh failed:', error);
+      } finally {
+        if (!disposed) setRefreshing(false);
+      }
     };
 
-    const totalEntities = {
-      totalPersons: entities.persons.length,
-      totalPhones: entities.phones.length,
-      totalEmails: entities.emails.length,
-      totalUsernames: entities.usernames.length,
-      totalOrganizations: entities.organizations.length,
-      totalLocations: entities.locations.length,
-      totalCryptoWallets: entities.cryptoWallets.length,
-      totalSocialAccounts: entities.socialAccounts.length,
-      totalVehicles: entities.vehicles.length,
-      totalDocuments: entities.documents.length,
-      totalRelationships: relationships.length,
+    void loadLiveDashboard();
+    const refreshTimer = window.setInterval(loadLiveDashboard, 15000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(refreshTimer);
     };
-
-    // Mock case stats
-    const activeCases = mockCases.filter(c => c.status === 'active' || c.status === 'open').length;
-    const totalAlerts = mockAlerts.length;
-    const highPriorityAlerts = mockAlerts.filter(a => a.severity === 'high' || a.severity === 'critical').length;
-
-    setStats(prev => ({ ...prev, ...totalEntities, activeCases, totalAlerts, highPriorityAlerts }));
-
-    // Mock recent searches
-    setRecentSearches([
-      { id: 'search_001', query: 'Rahul Sharma', timestamp: '2024-01-16T10:30:00Z', resultsCount: 12 },
-      { id: 'search_002', query: '+91-9876543210', timestamp: '2024-01-16T09:15:00Z', resultsCount: 8 },
-      { id: 'search_003', query: 'rahul.sharma@example.com', timestamp: '2024-01-16T08:45:00Z', resultsCount: 5 },
-      { id: 'search_004', query: 'TechSolutions Innovations', timestamp: '2024-01-15T16:20:00Z', resultsCount: 3 },
-      { id: 'search_005', query: '0x742d35Cc6634C0532925a3b8D4C0532950532950', timestamp: '2024-01-15T14:10:00Z', resultsCount: 7 },
-    ]);
-
-    setAlerts(mockAlerts);
-    setCases(mockCases);
   }, []);
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="flex items-center justify-between space-x-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gradient">Dashboard</h1>
-          <p className="text-police-400">Welcome back, {user?.name}</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-accent-cyan">Operations overview</p>
+          <h1 className="mt-1 text-3xl font-bold text-white">Good day, {user?.name}</h1>
+          <p className="mt-1 text-police-400">Monitor investigations, alerts, and intelligence activity.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-secondary px-4 py-2">
-            Refresh Data
+          <span className="flex items-center gap-2 text-xs text-police-500"><span className={`h-2 w-2 rounded-full ${refreshing ? 'animate-pulse bg-yellow-400' : 'bg-green-400'}`}></span>{refreshing ? 'Syncing' : lastSyncedAt ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString()}` : 'Connecting'}</span>
+          <button onClick={() => window.location.reload()} disabled={refreshing} className="btn-secondary px-4 py-2">{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Pending cases', value: stats.activeCases, detail: `${stats.totalCases} total investigations`, icon: 'folder', color: 'text-cyan-300', path: '/cases' },
+          { label: 'Activity alerts', value: stats.totalAlerts, detail: `${stats.highPriorityAlerts} high priority`, icon: 'bell', color: 'text-amber-300', path: '/alerts' },
+          { label: 'Entities tracked', value: stats.totalPersons + stats.totalOrganizations + stats.totalLocations + stats.totalPhones + stats.totalEmails, detail: `${stats.totalRelationships} relationships`, icon: 'users', color: 'text-emerald-300', path: '/data-management?section=entities' },
+          { label: 'Recent searches', value: recentSearches.length, detail: `${recentSearches.reduce((total, search) => total + search.resultsCount, 0)} results returned`, icon: 'search', color: 'text-violet-300', path: '/search' },
+        ].map((metric) => (
+          <button key={metric.label} onClick={() => navigate(metric.path)} className="card card-hover flex items-start justify-between p-5 text-left">
+            <div><p className="text-sm text-police-400">{metric.label}</p><p className="mt-2 text-3xl font-bold text-white">{metric.value}</p><p className="mt-2 text-xs text-police-500">{metric.detail}</p></div>
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-police-800/80 ${metric.color}`}>
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                {metric.icon === 'folder' && <path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />}
+                {metric.icon === 'bell' && <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></>}
+                {metric.icon === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>}
+                {metric.icon === 'search' && <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>}
+              </svg>
+            </div>
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Investigation Stats */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Investigations</h3>
-              <p className="text-police-400 text-sm">Active Cases</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-accent-cyan">{stats.activeCases}</p>
-              <p className="text-police-400 text-sm">of {stats.activeCases + 2} total</p>
-            </div>
-          </div>
-          <div className="h-0.5 bg-police-800 my-4"></div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Persons</span>
-              <span className="text-police-300">{stats.totalPersons}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Organizations</span>
-              <span className="text-police-300">{stats.totalOrganizations}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Relationships</span>
-              <span className="text-police-300">{stats.totalRelationships}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Entity Stats */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Entities</h3>
-              <p className="text-police-400 text-sm">Discovered Today</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-accent-cyan">
-                {stats.totalPhones + stats.totalEmails + stats.totalUsernames}
-              </p>
-              <p className="text-police-400 text-sm">Contacts</p>
-            </div>
-          </div>
-          <div className="h-0.5 bg-police-800 my-4"></div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Phone Numbers</span>
-              <span className="text-police-300">{stats.totalPhones}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Email Addresses</span>
-              <span className="text-police-300">{stats.totalEmails}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Usernames</span>
-              <span className="text-police-300">{stats.totalUsernames}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Crypto Wallets</span>
-              <span className="text-police-300">{stats.totalCryptoWallets}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Alerts & Activity */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Activity</h3>
-              <p className="text-police-400 text-sm">Alerts & Updates</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-accent-cyan">{stats.totalAlerts}</p>
-              <p className="text-police-400 text-sm">Total Alerts</p>
-            </div>
-          </div>
-          <div className="h-0.5 bg-police-800 my-4"></div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">High Priority</span>
-              <span className={`
-                text-sm px-2 py-0.5 rounded-full
-                ${stats.highPriorityAlerts > 0 ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}
-              `}>
-                {stats.highPriorityAlerts}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">New Today</span>
-              <span className="text-police-300">3</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-police-400">Acknowledged</span>
-              <span className="text-police-300">1</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Searches and Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Searches */}
-        <div className="card card-hover">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Recent Searches</h3>
-            <button className="text-sm text-police-400 hover:text-police-300">
-              View All
-            </button>
-          </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.9fr]">
+        <section className="card card-hover p-5">
+          <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-semibold text-white">Recent searches</h2><p className="text-sm text-police-500">Latest intelligence queries and result volume</p></div><button onClick={() => navigate('/search')} className="text-sm font-medium text-accent-cyan hover:text-cyan-200">Open search</button></div>
           <div className="space-y-3">
-            {recentSearches.map((search) => (
-              <div key={search.id} className="flex items-center justify-between p-3 bg-police-800/50 rounded-lg">
-                <div className="flex-1">
-                  <p className="font-medium text-white">{search.query}</p>
-                  <p className="text-police-400 text-sm">
-                    {new Date(search.timestamp).toLocaleString()} • {search.resultsCount} results
-                  </p>
-                </div>
-                <div className="text-police-300 text-sm">
-                  {search.resultsCount} results
-                </div>
-              </div>
-            ))}
+            {recentSearches.length ? recentSearches.map((search) => <div key={search.id} className="flex items-center gap-4 rounded-lg border border-police-800 bg-police-950/40 p-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-400/10 text-violet-300"><span className="text-sm font-bold">Q</span></div><div className="min-w-0 flex-1"><p className="truncate font-medium text-white">{search.query}</p><p className="text-xs text-police-500">{new Date(search.timestamp).toLocaleString()}</p></div><span className="whitespace-nowrap text-sm text-police-300">{search.resultsCount} results</span></div>) : <p className="py-8 text-center text-sm text-police-500">No recent searches recorded.</p>}
           </div>
-        </div>
+        </section>
 
-        {/* Active Alerts */}
-        <div className="card card-hover">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Active Alerts</h3>
-            <button className="text-sm text-police-400 hover:text-police-300">
-              View All
-            </button>
-          </div>
-          <div className="space-y-2">
-            {alerts.slice(0, 3).map((alert) => (
-              <div key={alert.id} className="flex items-start gap-3 p-3 bg-police-800/50 rounded-lg">
-                <div className="flex-shrink-0">
-                  <div className={`h-3 w-3 rounded-full
-                    ${alert.severity === 'critical' ? 'bg-red-500' :
-                    alert.severity === 'high' ? 'bg-orange-500' :
-                    alert.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}
-                  `}></div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-white">{alert.title}</h4>
-                  <p className="text-police-400 text-sm">{alert.description}</p>
-                  <p className="text-police-500 text-xs mt-1">
-                    {new Date(alert.createdAt).toLocaleString()} • 
-                    {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {alerts.length === 0 && (
-              <div className="text-center text-police-500 py-4">
-                No active alerts
-              </div>
-            )}
-          </div>
-        </div>
+        <section className="card card-hover p-5">
+          <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-semibold text-white">Cases by priority</h2><p className="text-sm text-police-500">Active and open investigations</p></div><button onClick={() => navigate('/cases')} className="text-sm font-medium text-accent-cyan hover:text-cyan-200">View cases</button></div>
+          <div className="space-y-4">{(['critical', 'high', 'medium', 'low'] as const).map((priority) => { const count = cases.filter((caseItem) => ['active', 'open'].includes(caseItem.status) && caseItem.priority === priority).length; const width = Math.min(100, count ? Math.max(12, (count / Math.max(stats.activeCases, 1)) * 100) : 0); return <div key={priority}><div className="mb-1 flex justify-between text-sm"><span className="capitalize text-police-300">{priority}</span><span className="font-semibold text-white">{count}</span></div><div className="h-2 rounded-full bg-police-800"><div className={`h-2 rounded-full ${priority === 'critical' ? 'bg-red-400' : priority === 'high' ? 'bg-orange-400' : priority === 'medium' ? 'bg-amber-300' : 'bg-emerald-400'}`} style={{ width: `${width}%` }}></div></div></div>; })}</div>
+        </section>
       </div>
 
-      {/* Cases Overview */}
-      <div className="card card-hover">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Active Cases</h3>
-          <button className="text-sm text-police-400 hover:text-police-300">
-            View All Cases
-          </button>
-        </div>
-        <div className="space-y-3">
-          {cases.map((caseItem) => (
-            <div key={caseItem.id} className="flex items-start gap-3 p-3 bg-police-800/50 rounded-lg">
-              <div className="flex-shrink-0">
-                <div className={`h-3 w-3 rounded-full
-                  ${caseItem.priority === 'critical' ? 'bg-red-500' :
-                  caseItem.priority === 'high' ? 'bg-orange-500' :
-                  caseItem.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'}
-                `}></div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-white">{caseItem.title}</h4>
-                <p className="text-police-400 text-sm">
-                  Case #{caseItem.caseNumber} • {caseItem.status} • Assigned to {caseItem.assignedTo}
-                </p>
-                <p className="text-police-500 text-xs mt-1">
-                  Updated: {new Date(caseItem.updatedAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          ))}
-          {cases.length === 0 && (
-            <div className="text-center text-police-500 py-4">
-              No active cases
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

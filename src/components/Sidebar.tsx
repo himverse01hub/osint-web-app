@@ -5,19 +5,17 @@ export const Sidebar = () => {
   
   const menuItems = [
     { icon: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+    { icon: 'folder', label: 'Case Management', path: '/cases' },
+    { icon: 'users', label: 'Entity & Activities', path: '/entity-activities' },
     { icon: 'search', label: 'OSINT Search', path: '/search' },
-    { icon: 'users', label: 'Profiles', path: '/profile' },
     { icon: 'message-square', label: 'AI Assistant', path: '/assistant' },
     { icon: 'git-graph', label: 'Knowledge Graph', path: '/graph' },
-    { icon: 'moon', label: 'Dark Web Intel', path: '/darkweb' },
     { icon: 'file-text', label: 'Reports', path: '/reports' },
-    { icon: 'bell', label: 'Alerts', path: '/alerts' },
-    { icon: 'clipboard', label: 'Audit Logs', path: '/audit' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
 
   return (
-    <aside className="bg-police-900/80 backdrop-blur-sm border-r border-police-800 w-64">
+    <aside className="flex min-h-[calc(100vh-73px)] w-64 flex-col border-r border-police-800 bg-police-900/80 backdrop-blur-sm">
       <div className="px-4 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-6">
           <div className="h-10 w-10 bg-police-800/50 rounded-lg flex items-center justify-center">
@@ -39,6 +37,7 @@ export const Sidebar = () => {
                   {item.icon === 'dashboard' && <><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></>}
                   {item.icon === 'search' && <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>}
                   {item.icon === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></>}
+                  {item.icon === 'folder' && <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>}
                   {item.icon === 'message-square' && <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>}
                   {item.icon === 'git-graph' && <><path d="M8 14a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"></path><path d="M20 8v8"></path><path d="M4 8v8"></path></>}
                   {item.icon === 'moon' && <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>}

@@ -1,61 +1,87 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSearchParams } from 'react-router-dom';
-import { generateMockData, generateMockRelationships } from '../data/mockData';
-import { Relationship } from '../types/osint';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export const KnowledgeGraphPage = () => {
-  const { authState } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [searchValue, setSearchValue] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
   const [nodes, setNodes] = useState<Array<any>>([]);
   const [edges, setEdges] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
-  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [showWeak, setShowWeak] = useState(true);
+  const [showUnverified, setShowUnverified] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [expandNeighbors, setExpandNeighbors] = useState(true);
+  const [entityType, setEntityType] = useState('all');
+  const [relationshipType, setRelationshipType] = useState('all');
+  const [minimumConfidence, setMinimumConfidence] = useState(0);
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [availableRelationshipTypes, setAvailableRelationshipTypes] = useState<string[]>([]);
 
   useEffect(() => {
     const loadGraph = async () => {
       setLoading(true);
+      if (!submittedSearch.trim()) {
+        setNodes([]);
+        setEdges([]);
+        setSelectedNode(null);
+        setLoading(false);
+        return;
+      }
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        
-        // Get mock data
-        const mockData = generateMockData();
-        const mockRelationships = generateMockRelationships(mockData);
-        
-        // Convert entities to nodes
-        const entityTypes = [
-          { type: 'person', data: mockData.persons, color: '#00d4ff' },
-          { type: 'phone', data: mockData.phones, color: '#00d47e' },
-          { type: 'email', data: mockData.emails, color: '#ffb800' },
-          { type: 'username', data: mockData.usernames, color: '#ff4d4d' },
-          { type: 'organization', data: mockData.organizations, color: '#8b5cf6' },
-          { type: 'location', data: mockData.locations, color: '#06b6d4' },
-          { type: 'crypto_wallet', data: mockData.cryptoWallets, color: '#f97316' },
-          { type: 'social_account', data: mockData.socialAccounts, color: '#ec4899' },
-          { type: 'vehicle', data: mockData.vehicles, color: '#6366f1' },
-          { type: 'document', data: mockData.documents, color: '#10b981' },
-        ];
+        const response = await fetch('/api/entities');
+        if (!response.ok) throw new Error('Knowledge graph request failed');
+        const graphData = await response.json();
+        const allEntities = graphData.entities ?? [];
+        const relationships = graphData.relationships ?? [];
+        setAvailableTypes(Array.from(new Set(allEntities.map((entity: any) => entity.type))).sort() as string[]);
+        setAvailableRelationshipTypes(Array.from(new Set(relationships.map((rel: any) => rel.type))).sort() as string[]);
+        const normalizedSearch = submittedSearch.toLowerCase();
+        const matchingEntities = allEntities.filter((entity: any) =>
+          (entityType === 'all' || entity.type === entityType) &&
+          [entity.label, entity.value, entity.type].some((value) =>
+            String(value ?? '').toLowerCase().includes(normalizedSearch)
+          )
+        );
+        const matchingIds = new Set(matchingEntities.map((entity: any) => entity.id));
+        const filteredRelationships = relationships.filter((rel: any) =>
+          (relationshipType === 'all' || rel.type === relationshipType) &&
+          Number(rel.confidence ?? 0) >= minimumConfidence &&
+          (showWeak || Number(rel.confidence ?? 0) >= 50) &&
+          (showUnverified || Boolean(rel.verified))
+        );
+        const graphIds = new Set(matchingIds);
+        if (expandNeighbors) {
+          filteredRelationships.forEach((rel: any) => {
+            if (matchingIds.has(rel.sourceId)) graphIds.add(rel.targetId);
+            if (matchingIds.has(rel.targetId)) graphIds.add(rel.sourceId);
+          });
+        }
+        const entities = allEntities.filter((entity: any) => graphIds.has(entity.id));
+        const entityIds = new Set(entities.map((entity: any) => entity.id));
+        const visibleRelationships = filteredRelationships.filter((rel: any) => entityIds.has(rel.sourceId) && entityIds.has(rel.targetId));
+        const colors: Record<string, string> = {
+          person: '#00d4ff', phone: '#00d47e', email: '#ffb800', username: '#ff4d4d',
+          organization: '#8b5cf6', location: '#06b6d4', crypto_wallet: '#f97316',
+          social_account: '#ec4899', vehicle: '#6366f1', document: '#10b981',
+        };
 
         const allNodes: any[] = [];
-        entityTypes.forEach(({ type, data, color }) => {
-          data.forEach((entity: any) => {
+        entities.forEach((entity: any) => {
             allNodes.push({
               id: entity.id,
               label: entity.label || entity.value,
-              type,
-              color,
+              type: entity.type,
+              color: colors[entity.type] || '#94a3b8',
               size: 20,
-              // For sizing based on connections
-              connections: mockRelationships.filter((rel: any) => 
+              connections: visibleRelationships.filter((rel: any) => 
                 rel.sourceId === entity.id || rel.targetId === entity.id
               ).length
             });
-          });
         });
 
-        // Adjust node sizes based on connection count
         const maxConnections = Math.max(...allNodes.map(n => n.connections), 1);
         allNodes.forEach(node => {
           // Size between 15 and 35 based on connection count
@@ -64,26 +90,23 @@ export const KnowledgeGraphPage = () => {
 
         setNodes(allNodes);
 
-        // Convert relationships to edges
-        const allEdges: any[] = mockRelationships.map((rel: any) => ({
+        const allEdges: any[] = visibleRelationships.map((rel: any) => ({
           id: rel.id,
           source: rel.sourceId,
           target: rel.targetId,
           label: rel.type.replace('_', ' '),
           type: rel.type,
-          strength: rel.strength,
+          strength: rel.strength ?? rel.confidence ?? 50,
           confidence: rel.confidence,
           color: rel.verified ? '#00d4ff' : '#ffb800',
-          width: Math.max(1, rel.strength / 10),
+          width: Math.max(1, (rel.strength ?? rel.confidence ?? 50) / 10),
           dashed: !rel.verified
         }));
 
         setEdges(allEdges);
 
-        // Handle focus node from URL params
         const focusId = searchParams.get('focus');
         if (focusId) {
-          setFocusNodeId(focusId);
           const focusedNode = allNodes.find(n => n.id === focusId);
           if (focusedNode) {
             setSelectedNode(focusedNode);
@@ -97,7 +120,7 @@ export const KnowledgeGraphPage = () => {
     };
 
     loadGraph();
-  }, [searchParams]);
+  }, [searchParams, submittedSearch, entityType, relationshipType, minimumConfidence, showWeak, showUnverified, expandNeighbors]);
 
   const handleNodeClick = (nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
@@ -110,7 +133,6 @@ export const KnowledgeGraphPage = () => {
 
   const handleBackgroundClick = () => {
     setSelectedNode(null);
-    setFocusNodeId(null);
     window.history.pushState({}, '', '?');
   };
 
@@ -156,47 +178,88 @@ export const KnowledgeGraphPage = () => {
         </div>
       </div>
 
-      {/* Graph Controls */}
-      <div className="flex items-center justify-between bg-police-900/50 rounded-lg p-4">
-        <div className="flex items-center gap-4">
-          <span className="text-police-400">Show:</span>
-          <div className="flex items-center gap-2">
+      <form
+        className="card flex flex-col gap-3 p-4 sm:flex-row"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSelectedNode(null);
+          setSubmittedSearch(searchValue.trim());
+        }}
+      >
+        <input
+          value={searchValue}
+          onChange={(event) => setSearchValue(event.target.value)}
+          className="input-field flex-1"
+          placeholder="Search entity, suspect, organization or type"
+          aria-label="Search knowledge graph"
+        />
+        <button type="submit" className="btn-primary px-5 py-2">Search Graph</button>
+        {submittedSearch && (
+          <button
+            type="button"
+            className="btn-secondary px-5 py-2"
+            onClick={() => { setSearchValue(''); setSubmittedSearch(''); }}
+          >
+            Clear
+          </button>
+        )}
+      </form>
+
+      <div className="card space-y-4 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-police-300">Entity type
+            <select value={entityType} onChange={event => setEntityType(event.target.value)} className="input-field ml-2 py-1.5">
+              <option value="all">All types</option>
+              {availableTypes.map(type => <option key={type} value={type}>{type.replace('_', ' ')}</option>)}
+            </select>
+          </label>
+          <label className="text-sm text-police-300">Relationship
+            <select value={relationshipType} onChange={event => setRelationshipType(event.target.value)} className="input-field ml-2 py-1.5">
+              <option value="all">All relationships</option>
+              {availableRelationshipTypes.map(type => <option key={type} value={type}>{type.replace('_', ' ')}</option>)}
+            </select>
+          </label>
+          <label className="text-sm text-police-300">Min confidence
+            <input type="number" min="0" max="100" value={minimumConfidence} onChange={event => setMinimumConfidence(Number(event.target.value))} className="input-field ml-2 w-20 py-1.5" />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="text-sm text-police-400">Investigation view:</span>
+          <label className="flex items-center gap-2 text-sm text-police-300">
             <input
               type="checkbox"
               id="show-weak"
-              className="h-4 w-4 text-accent-cyan focus:ring-police-500 border-police-600 rounded"
+              checked={showWeak}
+              onChange={event => setShowWeak(event.target.checked)}
+              className="h-4 w-4 rounded border-police-600 text-accent-cyan"
             />
-            <label htmlFor="show-weak" className="text-police-300 text-sm">
-              Weak Connections
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="show-unverified"
-              className="h-4 w-4 text-accent-cyan focus:ring-police-500 border-police-600 rounded"
-            />
-            <label htmlFor="show-unverified" className="text-police-300 text-sm">
-              Unverified Links
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="show-labels"
-              checked
-              className="h-4 w-4 text-accent-cyan focus:ring-police-500 border-police-600 rounded"
-            />
-            <label htmlFor="show-labels" className="text-police-300 text-sm">
-              Node Labels
-            </label>
-          </div>
+            Weak links
+          </label>
+          <label className="flex items-center gap-2 text-sm text-police-300">
+            <input type="checkbox" checked={showUnverified} onChange={event => setShowUnverified(event.target.checked)} className="h-4 w-4 rounded border-police-600 text-accent-cyan" />
+            Unverified links
+          </label>
+          <label className="flex items-center gap-2 text-sm text-police-300">
+            <input type="checkbox" checked={expandNeighbors} onChange={event => setExpandNeighbors(event.target.checked)} className="h-4 w-4 rounded border-police-600 text-accent-cyan" />
+            Expand one-hop neighbors
+          </label>
+          <label className="flex items-center gap-2 text-sm text-police-300">
+            <input type="checkbox" checked={showLabels} onChange={event => setShowLabels(event.target.checked)} className="h-4 w-4 rounded border-police-600 text-accent-cyan" />
+            Node labels
+          </label>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setEntityType('person'); setRelationshipType('all'); setMinimumConfidence(70); setShowWeak(false); setShowUnverified(false); }} className="btn-secondary px-3 py-1.5 text-sm">High-confidence people</button>
+          <button type="button" onClick={() => { setEntityType('all'); setRelationshipType('phone_shared'); setMinimumConfidence(0); setShowWeak(true); setShowUnverified(true); }} className="btn-secondary px-3 py-1.5 text-sm">Phone network</button>
+          <button type="button" onClick={() => { setEntityType('all'); setRelationshipType('all'); setMinimumConfidence(0); setShowWeak(true); setShowUnverified(true); }} className="btn-secondary px-3 py-1.5 text-sm">Reset view</button>
+        </div>
+      </div>
+
+      {/* Graph Controls */}
+      <div className="flex items-center justify-end bg-police-900/50 rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <button className="text-sm text-police-400 hover:text-police-300">
-            Layout: Force Directed
-          </button>
-          <button className="btn-secondary px-3 py-1">
+          <span className="text-sm text-police-500">Node size reflects connection count</span>
+          <button type="button" onClick={() => document.getElementById('graph-container')?.requestFullscreen()} className="btn-secondary px-3 py-1.5 text-sm">
             Fullscreen
           </button>
         </div>
@@ -204,21 +267,15 @@ export const KnowledgeGraphPage = () => {
 
       {/* Graph Display */}
       <div className="relative">
-        {/* In a real implementation, this would use a graph visualization library like vis.js or cytoscape.js */}
         <div 
           id="graph-container"
           className="w-full h-[600px] bg-police-800/50 rounded-lg border border-police-700"
           onClick={handleBackgroundClick}
         >
-          {/* Placeholder for graph visualization */}
           <div className="flex items-center justify-center h-full text-police-500">
-            <p>Knowledge graph visualization would appear here in the full implementation.</p>
-            <p className="mt-2 text-sm">
-              Showing {nodes.length} entities and {edges.length} relationships.
-            </p>
+            <p>{nodes.length ? `Showing matches for "${submittedSearch}": ${nodes.length} entities and ${edges.length} relationships.` : `No saved entities match "${submittedSearch}".`}</p>
           </div>
-          
-          {/* Mock nodes and edges for demonstration */}
+
           {nodes.map((node, idx) => {
             const leftPos = (idx * 13 + 10) % 80 + 5;
             const topPos = (idx * 19 + 15) % 75 + 5;
@@ -237,31 +294,11 @@ export const KnowledgeGraphPage = () => {
                 }}
               >
                 <div className="h-4 w-4 rounded-full" style={{ backgroundColor: node.color }}></div>
-                <span className="text-xs text-white">{node.label.length > 8 ? node.label.slice(0, 8) + '...' : node.label}</span>
+                {showLabels && <span className="text-xs text-white">{node.label.length > 18 ? node.label.slice(0, 18) + '...' : node.label}</span>}
               </div>
             );
           })}
           
-          {/* Mock edges (simplified) */}
-          {edges.slice(0, 10).map((edge, index) => {
-            const leftPos = (index * 17 + 20) % 80 + 5;
-            const topPos = (index * 23 + 30) % 60 + 5;
-            const borderWidth = Math.max(1, Math.floor(edge.strength / 10));
-            const borderColor = edge.verified ? 'border-accent-cyan' : 'border-yellow-400';
-            return (
-              <div 
-                key={edge.id}
-                style={{ 
-                  left: `${leftPos}%`, 
-                  top: `${topPos}%`,
-                  width: `${Math.random() * 30 + 20}%`,
-                  height: '1px',
-                  borderTopWidth: `${borderWidth}px`,
-                }}
-                className={`absolute opacity-60 ${borderColor} ${edge.dashed ? 'border-dashed' : 'border-solid'}`}
-              ></div>
-            );
-          })}
         </div>
       </div>
 
@@ -274,7 +311,7 @@ export const KnowledgeGraphPage = () => {
             </h3>
             <button 
               onClick={() => {
-                // Navigate to profile page
+                navigate(`/profile/${encodeURIComponent(selectedNode.id)}`);
               }}
               className="text-sm text-police-400 hover:text-police-300"
             >

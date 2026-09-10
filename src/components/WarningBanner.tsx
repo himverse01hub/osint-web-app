@@ -1,4 +1,10 @@
+import { useState } from 'react';
+
 export const WarningBanner = () => {
+  const [visible, setVisible] = useState(true);
+
+  if (!visible) return null;
+
   return (
     <div className="bg-red-900/50 border border-red-700/50 text-red-300 text-sm px-4 py-2">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -10,7 +16,7 @@ export const WarningBanner = () => {
             <strong>WARNING:</strong> For authorised investigative use only. All searches must comply with applicable laws and policies.
           </span>
         </div>
-        <button className="text-red-400 hover:text-red-300 transition-colors px-3 py-1 rounded hover:bg-red-800/20">
+        <button onClick={() => setVisible(false)} className="text-red-400 hover:text-red-300 transition-colors px-3 py-1 rounded hover:bg-red-800/20">
           Close
         </button>
       </div>

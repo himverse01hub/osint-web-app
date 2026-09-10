@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { generateMockAuditLogs } from '../data/mockData';
-import { AuditLog } from '../types/osint';
+import type { AuditLog } from '../types/osint';
 
 export const AuditLogsPage = () => {
-  const { authState } = useAuth();
-  const { user } = authState;
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAction, setFilterAction] = useState<'all' | string>('all');
@@ -13,16 +9,13 @@ export const AuditLogsPage = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'success' | 'failure'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    const loadLogs = async () => {
+  const loadLogs = async () => {
       setLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Get mock data
-        const mockLogs = generateMockAuditLogs(user.id, user.name);
-        setLogs(mockLogs);
+        const response = await fetch('/api/audit-logs');
+        if (!response.ok) throw new Error('Audit logs request failed');
+        const data = await response.json();
+        setLogs(data.logs ?? []);
       } catch (error) {
         console.error('Error loading audit logs:', error);
       } finally {
@@ -30,8 +23,7 @@ export const AuditLogsPage = () => {
       }
     };
 
-    loadLogs();
-  }, [user.id, user.name]);
+  useEffect(() => { void loadLogs(); }, []);
 
   const filteredLogs = logs.filter(log => {
     const actionMatch = filterAction === 'all' || log.action.toLowerCase().includes(filterAction.toLowerCase());
@@ -41,7 +33,7 @@ export const AuditLogsPage = () => {
       !searchTerm ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.resourceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.ipAddress.includes(searchTerm) ||
+      log.details.ipAddress !== undefined && String(log.details.ipAddress).includes(searchTerm) ||
       log.userName.toLowerCase().includes(searchTerm.toLowerCase());
     return actionMatch && resourceMatch && statusMatch && searchMatch;
   });
@@ -56,9 +48,7 @@ export const AuditLogsPage = () => {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => {
-              // Refresh logs
-            }}
+            onClick={() => void loadLogs()}
             className="btn-secondary px-4 py-2"
           >
             Refresh
@@ -152,7 +142,7 @@ export const AuditLogsPage = () => {
                     </td>
                     <td className="px-4 py-3 text-police-300 text-sm">{log.action}</td>
                     <td className="px-4 py-3 text-police-300 text-sm">{log.resourceType}</td>
-                    <td className="px-4 py-3 text-police-300 text-sm">{log.details.ipAddress}</td>
+                    <td className="px-4 py-3 text-police-300 text-sm">{String(log.details.ipAddress ?? '')}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs
                         ${log.status === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}
@@ -161,7 +151,7 @@ export const AuditLogsPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-police-400 text-sm">
-                      {log.details.userAgent ? (
+                      {typeof log.details.userAgent === 'string' ? (
                         <span title={log.details.userAgent} className="line-clamp-1">
                           {log.details.userAgent.length > 30 ? log.details.userAgent.substring(0, 30) + '...' : log.details.userAgent}
                         </span>
@@ -171,8 +161,8 @@ export const AuditLogsPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-4 py-6 text-center text-police-500">
-                    No audit logs match the current filters.
+                  <td colSpan={7} className="px-4 py-6 text-center text-police-500">
+                    {loading ? 'Loading logs...' : 'No audit logs match the current filters.'}
                   </td>
                 </tr>
               )}
