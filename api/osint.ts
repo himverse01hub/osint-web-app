@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { isDatabaseConfigured, requireDatabase } from './_lib/db.js';
 
-const exiftool = new ExifTool({ taskTimeoutMillis: 30000 });
 const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
@@ -33,18 +32,22 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
   const imageData = request.body?.imageData ? String(request.body.imageData) : '';
   const base64Data = imageData.replace(/^data:[^;]+;base64,/, '');
 
+  if (!base64Data) {
+    return response.status(400).json({ error: 'imageData (base64) is required' });
+  }
+
   let tempPath: string | undefined;
+  let outputPath: string | undefined;
 
   try {
     if (action === 'extract') {
-      if (!base64Data) {
-        return response.status(400).json({ error: 'imageData (base64) is required' });
-      }
-
       tempPath = join(tmpdir(), `osint-exif-${Date.now()}.jpg`);
       writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
 
+      const exiftool = new ExifTool({ taskTimeoutMillis: 15000 });
       const tags = await exiftool.read(tempPath);
+      await exiftool.end();
+
       const metadata: Record<string, string> = {};
 
       const relevantTags = [
@@ -82,15 +85,13 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
     }
 
     if (action === 'sanitize') {
-      if (!base64Data) {
-        return response.status(400).json({ error: 'imageData (base64) is required' });
-      }
-
       tempPath = join(tmpdir(), `osint-sanitize-${Date.now()}.jpg`);
-      const outputPath = join(tmpdir(), `osint-sanitize-out-${Date.now()}.jpg`);
+      outputPath = join(tmpdir(), `osint-sanitize-out-${Date.now()}.jpg`);
       writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
 
-      await exiftool.write(tempPath, {}, ['-tagsFile', tempPath, '-all=', '-o', outputPath]);
+      const exiftool = new ExifTool({ taskTimeoutMillis: 15000 });
+      await exiftool.write(tempPath, {}, ['-all=', '-o', outputPath]);
+      await exiftool.end();
 
       const sanitizedBase64 = readFileSync(outputPath, { encoding: 'base64' });
       const sanitizedResult = `data:image/jpeg;base64,${sanitizedBase64}`;
@@ -107,10 +108,14 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
     return response.status(400).json({ error: 'Invalid action. Use "extract" or "sanitize"' });
   } catch (error) {
     console.error('ExifTool request failed:', error);
-    return response.status(503).json({ error: 'ExifTool processing failed', details: error instanceof Error ? error.message : 'Unknown error' });
+    return response.status(503).json({
+      error: 'ExifTool processing failed',
+      details: error instanceof Error ? error.message : String(error),
+      hint: 'exiftool-vendored may need to download the binary on first use. Ensure cold start timeout is sufficient.',
+    });
   } finally {
-    await exiftool.end();
     if (tempPath && existsSync(tempPath)) { try { unlinkSync(tempPath); } catch {} }
+    if (outputPath && existsSync(outputPath)) { try { unlinkSync(outputPath); } catch {} }
   }
 }
 
@@ -144,17 +149,3 @@ async function handleGhunt(request: VercelRequest, response: VercelResponse) {
     });
   });
 }
-
-export async function health(_request: VercelRequest, response: VercelResponse) {
-  if (!isDatabaseConfigured) {
-    return response.status(503).json({ ok: false, database: 'not_configured' });
-  }
-  try {
-    const database = requireDatabase();
-    await database`SELECT 1 AS connected`;
-    return response.status(200).json({ ok: true, database: 'connected' });
-  } catch {
-    return response.status(503).json({ ok: false, database: 'unavailable' });
-  }
-}
-
