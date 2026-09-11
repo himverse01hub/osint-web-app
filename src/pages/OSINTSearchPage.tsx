@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EntityType } from '../types/osint';
 import { EntityManager } from '../components/EntityManager';
@@ -20,7 +20,6 @@ export const OSINTSearchPage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [recentSearches, setRecentSearches] = useState<Array<{query: string; type: string; timestamp: string; count: number}>>([]);
-  const [searchHistory, setSearchHistory] = useState<Array<{query: string; type: string; timestamp: string; count: number}>>([]);
 
   const handleSearch = async (searchPage = 1, searchLimit = limit) => {
     if (!searchValue.trim()) return;
@@ -77,49 +76,12 @@ export const OSINTSearchPage = () => {
       const updated = [searchEntry, ...recentSearches.filter(s => s.query !== searchEntry.query || s.type !== searchEntry.type)].slice(0, 20);
       setRecentSearches(updated);
       localStorage.setItem('recentSearches', JSON.stringify(updated));
-
-      void loadSearchHistory();
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search request failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadSearchHistory = useCallback(async () => {
-    try {
-      const response = await fetch('/api/search-history');
-      if (response.ok) {
-        const data = await response.json();
-        setSearchHistory((data.searches ?? []).map((s: any) => ({
-          query: s.query,
-          type: s.searchType,
-          timestamp: s.timestamp,
-          count: s.resultsCount,
-        })));
-      }
-    } catch {
-      // silently fail
-    }
-  }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('recentSearches');
-    if (saved) {
-      try {
-        setRecentSearches(JSON.parse(saved));
-      } catch {
-        // ignore
-      }
-    }
-    void loadSearchHistory();
-  }, [loadSearchHistory]);
-
-  const applyRecentSearch = (query: string, type: string) => {
-    setSearchValue(query);
-    setSearchType(type as EntityType);
-    void handleSearch(1);
   };
 
   const toggleFilter = (filter: string) => {
@@ -288,30 +250,6 @@ export const OSINTSearchPage = () => {
             <p className="mt-3 text-sm font-medium text-accent-cyan">Open Activity Log →</p>
           </button>
         </div>
-
-        {/* Search History Timeline */}
-        {searchHistory.length > 0 && (
-          <div className="card card-hover p-4">
-            <h3 className="text-lg font-semibold text-white mb-3">Recent Search History</h3>
-            <div className="space-y-2">
-              {searchHistory.slice(0, 5).map((search, idx) => (
-                <button
-                  key={`timeline-${idx}`}
-                  onMouseDown={() => applyRecentSearch(search.query, search.type)}
-                  className="w-full flex items-center justify-between p-2 rounded hover:bg-police-800/50 text-left"
-                >
-                  <div>
-                    <p className="text-sm text-white">{search.query}</p>
-                    <p className="text-xs text-police-500">
-                      {new Date(search.timestamp).toLocaleString()} • {search.count} results
-                    </p>
-                  </div>
-                  <span className="text-xs text-police-400">{search.type}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Search Tips */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
