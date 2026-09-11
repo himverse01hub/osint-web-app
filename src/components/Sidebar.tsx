@@ -8,6 +8,7 @@ export const Sidebar = () => {
     { icon: 'folder', label: 'Case Management', path: '/cases' },
     { icon: 'users', label: 'Entity & Activities', path: '/entity-activities' },
     { icon: 'search', label: 'OSINT Search', path: '/search' },
+    { icon: 'tool', label: 'OSINT Tools', path: '/osint-tools' },
     { icon: 'message-square', label: 'AI Assistant', path: '/assistant' },
     { icon: 'git-graph', label: 'Knowledge Graph', path: '/graph' },
     { icon: 'file-text', label: 'Reports', path: '/reports' },
@@ -45,6 +46,7 @@ export const Sidebar = () => {
                   {item.icon === 'bell' && <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></>}
                   {item.icon === 'clipboard' && <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v2"></path></>}
                   {item.icon === 'settings' && <><circle cx="12" cy="12" r="10"></circle><path d="M12 15v5"></path><path d="M12 6v3"></path><path d="M6.343 18.343l-.707-.707"></path><path d="M17.657 17.657l-.707-.707"></path><path d="M6.343 5.657l.707.707"></path><path d="M17.657 6.343l.707.707"></path></>}
+                    {item.icon === 'tool' && <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></>}
                 </svg>
                 <span className="text-police-300 group-hover:text-white transition-colors font-medium">{item.label}</span>
               </div>

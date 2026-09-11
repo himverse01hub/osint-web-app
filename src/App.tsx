@@ -14,6 +14,8 @@ import SettingsPage from './pages/SettingsPage';
 import CasesPage from './pages/CasesPage';
 import CaseDetailPage from './pages/CaseDetailPage';
 import EntityActivitiesPage from './pages/EntityActivitiesPage';
+import OSTINToolsPage from './pages/OSTINToolsPage';
+import SearchHistoryPage from './pages/SearchHistoryPage';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 
@@ -55,6 +57,8 @@ function App() {
               <Route path="/entity-activities" element={<EntityActivitiesPage />} />
               <Route path="/case/:caseId" element={<CaseDetailPage />} />
               <Route path="/search" element={<OSINTSearchPage />} />
+              <Route path="/osint-tools" element={<OSTINToolsPage />} />
+              <Route path="/search-history" element={<SearchHistoryPage />} />
               <Route path="/profile" element={<OSINTSearchPage />} />
               <Route path="/profile/:entityId" element={<SuspectProfilePage />} />
               <Route path="/assistant" element={<AIAssistantPage />} />
