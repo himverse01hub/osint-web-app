@@ -1,11 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ExifTool } from 'exiftool-vendored';
-import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 
 const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
+
+let piexif: any;
+async function getPiexif() {
+  if (!piexif) {
+    const mod = await import('piexifjs');
+    piexif = mod.default || mod;
+  }
+  return piexif;
+}
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') {
@@ -35,86 +41,76 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
     return response.status(400).json({ error: 'imageData (base64) is required' });
   }
 
-  let tempPath: string | undefined;
-  let outputPath: string | undefined;
-
   try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    const p = await getPiexif();
+
     if (action === 'extract') {
-      tempPath = join(tmpdir(), `osint-exif-${Date.now()}.jpg`);
-      writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
-
-      const exiftool = new ExifTool({ taskTimeoutMillis: 15000 });
-      const tags = await exiftool.read(tempPath);
-      await exiftool.end();
-
+      const exifObj = p.load(buffer.toString('binary'));
       const metadata: Record<string, string> = {};
 
-      const relevantTags = [
-        'FileName', 'FileSize', 'FileType', 'MIMEType', 'DateCreate', 'DateModify', 'DateAccess',
-        'CameraMake', 'CameraModel', 'LensModel', 'FNumber', 'ExposureTime', 'ISO',
-        'ExposureCompensation', 'Flash', 'FocalLength', 'Orientation',
-        'GPSLatitude', 'GPSLongitude', 'GPSAltitude', 'GPSPosition',
-        'Copyright', 'Artist', 'Author', 'Creator', 'Description',
-        'Software', 'MediaCreateDate', 'SubSecCreateDate',
-        'MakerNote', 'SerialNumber', 'ImageUniqueID', 'DocumentID', 'GroupID', 'Company',
-        'Location', 'Country', 'State', 'City', 'Sublocation',
-      ];
+      const tagMap0th: Record<string, string[]> = {
+        Make: ['0th', 'Make'], Model: ['0th', 'Model'],
+        Orientation: ['0th', 'Orientation'], Software: ['0th', 'Software'],
+        DateTime: ['0th', 'DateTime'], Artist: ['0th', 'Artist'],
+        Copyright: ['0th', 'Copyright'],
+      };
 
-      for (const tag of relevantTags) {
-        const val = (tags as Record<string, unknown>)[tag];
-        if (val !== undefined && val !== null && String(val) !== '') {
-          metadata[tag] = String(val);
+      const tagMapExif: Record<string, string[]> = {
+        ExposureTime: ['Exif', 'ExposureTime'], FNumber: ['Exif', 'FNumber'],
+        ISOSpeedRatings: ['Exif', 'ISOSpeedRatings'], FocalLength: ['Exif', 'FocalLength'],
+        DateTimeDigitized: ['Exif', 'DateTimeDigitized'], DateTimeOriginal: ['Exif', 'DateTimeOriginal'],
+        LensMake: ['Exif', 'LensMake'], LensModel: ['Exif', 'LensModel'],
+      };
+
+      const readTags = (tagMap: Record<string, string[]>) => {
+        for (const [name, [ifd, key]] of Object.entries(tagMap)) {
+          const val = exifObj[ifd]?.[key];
+          if (val !== undefined && val !== null && String(val) !== '') {
+            metadata[name] = String(val);
+          }
         }
-      }
+      };
 
-      const lat = (tags as Record<string, unknown>)['GPSLatitude'];
-      const lon = (tags as Record<string, unknown>)['GPSLongitude'];
-      if (lat && lon) {
+      readTags(tagMap0th);
+      readTags(tagMapExif);
+
+      metadata.allTags = String(
+        Object.keys(exifObj['0th'] ?? {}).length +
+        Object.keys(exifObj['Exif'] ?? {}).length
+      );
+
+      if (exifObj['GPS']?.GPSLatitude && exifObj['GPS']?.GPSLongitude) {
+        const lat = exifObj['GPS']['GPSLatitude'];
+        const lon = exifObj['GPS']['GPSLongitude'];
         metadata.GPS = JSON.stringify({
-          latitude: String(lat),
-          longitude: String(lon),
-          altitude: (tags as Record<string, unknown>)['GPSAltitude'] ? String((tags as Record<string, unknown>)['GPSAltitude']) : undefined,
-          position: (tags as Record<string, unknown>)['GPSPosition'] ? String((tags as Record<string, unknown>)['GPSPosition']) : undefined,
+          latitude: Array.isArray(lat) ? lat.map(v => String(v)).join(', ') : String(lat),
+          longitude: Array.isArray(lon) ? lon.map(v => String(v)).join(', ') : String(lon),
         });
       }
-
-      metadata.allTags = String(Object.keys(tags).length);
 
       return response.status(200).json({ metadata, success: true });
     }
 
     if (action === 'sanitize') {
-      tempPath = join(tmpdir(), `osint-sanitize-${Date.now()}.jpg`);
-      outputPath = join(tmpdir(), `osint-sanitize-out-${Date.now()}.jpg`);
-      writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
-
-      const exiftool = new ExifTool({ taskTimeoutMillis: 15000 });
-      await exiftool.write(tempPath, {}, ['-all=', '-o', outputPath]);
-      await exiftool.end();
-
-      const sanitizedBase64 = readFileSync(outputPath, { encoding: 'base64' });
-      const sanitizedResult = `data:image/jpeg;base64,${sanitizedBase64}`;
-      const outputBuffer = existsSync(outputPath) ? readFileSync(outputPath) : Buffer.alloc(0);
+      const sanitized = p.remove(buffer.toString('binary'));
+      const sanitizedBuffer = Buffer.from(sanitized, 'binary');
 
       return response.status(200).json({
-        sanitized: sanitizedResult,
-        originalSize: outputBuffer.length,
+        sanitized: `data:image/jpeg;base64,${sanitizedBuffer.toString('base64')}`,
+        originalSize: buffer.length,
         success: true,
-        message: 'EXIF data removed while preserving essential metadata',
+        message: 'All EXIF data removed',
       });
     }
 
     return response.status(400).json({ error: 'Invalid action. Use "extract" or "sanitize"' });
   } catch (error) {
-    console.error('ExifTool request failed:', error);
+    console.error('EXIF request failed:', error);
     return response.status(503).json({
-      error: 'ExifTool processing failed',
+      error: 'EXIF processing failed',
       details: error instanceof Error ? error.message : String(error),
-      hint: 'exiftool-vendored may need to download the binary on first use. Ensure cold start timeout is sufficient.',
     });
-  } finally {
-    if (tempPath && existsSync(tempPath)) { try { unlinkSync(tempPath); } catch {} }
-    if (outputPath && existsSync(outputPath)) { try { unlinkSync(outputPath); } catch {} }
   }
 }
 
