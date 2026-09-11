@@ -1,17 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { execFile } from 'node:child_process';
 
 const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
-
-let piexif: any;
-async function getPiexif() {
-  if (!piexif) {
-    const mod = await import('piexifjs');
-    piexif = mod.default || mod;
-  }
-  return piexif;
-}
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') {
@@ -26,7 +15,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
 
   if (tool === 'ghunt') {
-    return handleGhunt(request, response);
+    // GHunt requires Python and is only available for local deployment
+    // On Vercel serverless functions, Python is not available
+    return response.status(503).json({
+      error: 'GHunt not available on Vercel',
+      details: 'GHunt requires Python interpreter which is not available in Vercel serverless functions.',
+      hint: 'For local deployment only. Use the ExifTool endpoint for image metadata.',
+    });
   }
 
   return response.status(400).json({ error: 'Invalid tool. Use "exiftool" or "ghunt"' });
@@ -43,24 +38,34 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
 
   try {
     const buffer = Buffer.from(base64Data, 'base64');
-    const p = await getPiexif();
+
+    // Lazy-load piexifjs (CommonJS module) on demand
+    const piexif = (await import('piexifjs')).default || (await import('piexifjs'));
 
     if (action === 'extract') {
-      const exifObj = p.load(buffer.toString('binary'));
+      const exifObj = piexif.load(buffer.toString('binary'));
       const metadata: Record<string, string> = {};
 
       const tagMap0th: Record<string, string[]> = {
-        Make: ['0th', 'Make'], Model: ['0th', 'Model'],
-        Orientation: ['0th', 'Orientation'], Software: ['0th', 'Software'],
-        DateTime: ['0th', 'DateTime'], Artist: ['0th', 'Artist'],
+        Make: ['0th', 'Make'],
+        Model: ['0th', 'Model'],
+        Orientation: ['0th', 'Orientation'],
+        Software: ['0th', 'Software'],
+        DateTime: ['0th', 'DateTime'],
+        Artist: ['0th', 'Artist'],
         Copyright: ['0th', 'Copyright'],
       };
 
       const tagMapExif: Record<string, string[]> = {
-        ExposureTime: ['Exif', 'ExposureTime'], FNumber: ['Exif', 'FNumber'],
-        ISOSpeedRatings: ['Exif', 'ISOSpeedRatings'], FocalLength: ['Exif', 'FocalLength'],
-        DateTimeDigitized: ['Exif', 'DateTimeDigitized'], DateTimeOriginal: ['Exif', 'DateTimeOriginal'],
-        LensMake: ['Exif', 'LensMake'], LensModel: ['Exif', 'LensModel'],
+        ExposureTime: ['Exif', 'ExposureTime'],
+        FNumber: ['Exif', 'FNumber'],
+        ISOSpeedRatings: ['Exif', 'ISOSpeedRatings'],
+        FocalLength: ['Exif', 'FocalLength'],
+        DateTimeDigitized: ['Exif', 'DateTimeDigitized'],
+        DateTimeOriginal: ['Exif', 'DateTimeOriginal'],
+        LensMake: ['Exif', 'LensMake'],
+        LensModel: ['Exif', 'LensModel'],
+        Flash: ['Exif', 'Flash'],
       };
 
       const readTags = (tagMap: Record<string, string[]>) => {
@@ -84,8 +89,8 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
         const lat = exifObj['GPS']['GPSLatitude'];
         const lon = exifObj['GPS']['GPSLongitude'];
         metadata.GPS = JSON.stringify({
-          latitude: Array.isArray(lat) ? lat.map(v => String(v)).join(', ') : String(lat),
-          longitude: Array.isArray(lon) ? lon.map(v => String(v)).join(', ') : String(lon),
+          latitude: Array.isArray(lat) ? lat.map((v: any) => String(v)).join(', ') : String(lat),
+          longitude: Array.isArray(lon) ? lon.map((v: any) => String(v)).join(', ') : String(lon),
         });
       }
 
@@ -93,7 +98,7 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
     }
 
     if (action === 'sanitize') {
-      const sanitized = p.remove(buffer.toString('binary'));
+      const sanitized = piexif.remove(buffer.toString('binary'));
       const sanitizedBuffer = Buffer.from(sanitized, 'binary');
 
       return response.status(200).json({
@@ -110,37 +115,7 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
     return response.status(503).json({
       error: 'EXIF processing failed',
       details: error instanceof Error ? error.message : String(error),
+      hint: 'Ensure the image is a valid JPEG/JPG format with readable EXIF data',
     });
   }
-}
-
-async function handleGhunt(request: VercelRequest, response: VercelResponse) {
-  const action = String(request.body?.action ?? 'email');
-  const query = String(request.body?.query ?? '').trim();
-
-  if (!query) {
-    return response.status(400).json({ error: 'query is required' });
-  }
-
-  const validActions = ['email', 'geolocate', 'image', 'social', 'google'];
-  if (!validActions.includes(action)) {
-    return response.status(400).json({ error: `Invalid action. Use: ${validActions.join(', ')}` });
-  }
-
-  return new Promise((resolve) => {
-    execFile(ghuntPath, [action, query], { timeout: 120000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
-      if (error) {
-        console.error('GHunt request failed:', error);
-        return response.status(503).json({
-          error: 'GHunt processing failed',
-          details: stderr || error.message,
-          hint: 'GHunt requires Python and is only available for local deployment.',
-        });
-      }
-      resolve(response.status(200).json({
-        result: { action, query, output: stdout },
-        success: true,
-      }));
-    });
-  });
 }
