@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ExifTool } from 'exiftool-vendored';
-import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -33,7 +33,6 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
   const base64Data = imageData.replace(/^data:[^;]+;base64,/, '');
 
   let tempPath: string | undefined;
-  let outputPath: string | undefined;
 
   try {
     if (action === 'extract') {
@@ -60,7 +59,7 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
 
       for (const tag of relevantTags) {
         const val = (tags as Record<string, unknown>)[tag];
-        if (val !== undefined && val !== null && val !== '') {
+        if (val !== undefined && val !== null && String(val) !== '') {
           metadata[tag] = String(val);
         }
       }
@@ -87,14 +86,10 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
       }
 
       tempPath = join(tmpdir(), `osint-sanitize-${Date.now()}.jpg`);
-      outputPath = join(tmpdir(), `osint-sanitize-out-${Date.now()}.jpg`);
+      const outputPath = join(tmpdir(), `osint-sanitize-out-${Date.now()}.jpg`);
       writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
 
-      await exiftool.write(tempPath, {}, {
-        destinationFile: outputPath,
-        preserve: ['FileName', 'FileModifyDate'],
-        tags: ['GPSLatitude', 'GPSLongitude', 'GPSAltitude', 'GPSPosition', 'MakerNote', 'Copyright', 'Author', 'Artist', 'DocumentID', 'GroupID', 'ImageUniqueID'],
-      });
+      await exiftool.write(tempPath, {}, ['-tagsFile', tempPath, '-all=', '-o', outputPath]);
 
       const sanitizedBase64 = readFileSync(outputPath, { encoding: 'base64' });
       const sanitizedResult = `data:image/jpeg;base64,${sanitizedBase64}`;
@@ -115,7 +110,6 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
   } finally {
     await exiftool.end();
     if (tempPath && existsSync(tempPath)) { try { unlinkSync(tempPath); } catch {} }
-    if (outputPath && existsSync(outputPath)) { try { unlinkSync(outputPath); } catch {} }
   }
 }
 
