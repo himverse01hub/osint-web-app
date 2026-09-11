@@ -5,36 +5,12 @@
       "destination": "/api/auth"
     },
     {
-      "source": "/api/exiftool",
-      "destination": "/api/exiftool",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "source": "/api/ghunt",
-      "destination": "/api/ghunt",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
+      "source": "/api/osint",
+      "destination": "/api/osint"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/exiftool.ts": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
-    },
-    "api/ghunt.ts": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
-    }
-  }
+  ]
 }

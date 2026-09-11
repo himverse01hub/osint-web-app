@@ -22,10 +22,10 @@ export const GhuntPanel = () => {
     setError('');
     setResult(null);
     try {
-      const response = await fetch('/api/ghunt', {
+      const response = await fetch('/api/osint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, query: query.trim() }),
+        body: JSON.stringify({ tool: 'ghunt', action, query: query.trim() }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'GHunt search failed');

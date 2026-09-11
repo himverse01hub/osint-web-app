@@ -52,11 +52,11 @@ export const ExifToolPanel = () => {
     setLoading(true);
     setError('');
     setResult(null);
-    try {
-      const response = await fetch('/api/exiftool', {
+      try {
+      const response = await fetch('/api/osint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, imageData }),
+        body: JSON.stringify({ tool: 'exiftool', action, imageData }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Processing failed');
