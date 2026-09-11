@@ -4,6 +4,7 @@ import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
+import { isDatabaseConfigured, requireDatabase } from './_lib/db.js';
 
 const exiftool = new ExifTool({ taskTimeoutMillis: 30000 });
 const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
@@ -143,3 +144,17 @@ async function handleGhunt(request: VercelRequest, response: VercelResponse) {
     });
   });
 }
+
+export async function health(_request: VercelRequest, response: VercelResponse) {
+  if (!isDatabaseConfigured) {
+    return response.status(503).json({ ok: false, database: 'not_configured' });
+  }
+  try {
+    const database = requireDatabase();
+    await database`SELECT 1 AS connected`;
+    return response.status(200).json({ ok: true, database: 'connected' });
+  } catch {
+    return response.status(503).json({ ok: false, database: 'unavailable' });
+  }
+}
+
