@@ -12,6 +12,7 @@ export const Sidebar = () => {
     { icon: 'message-square', label: 'AI Assistant', path: '/assistant' },
     { icon: 'git-graph', label: 'Knowledge Graph', path: '/graph' },
     { icon: 'file-text', label: 'Reports', path: '/reports' },
+    { icon: 'clock', label: 'Search History', path: '/search-history' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
 
@@ -38,6 +39,10 @@ export const Sidebar = () => {
                   {item.icon === 'dashboard' && <><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></>}
                   {item.icon === 'search' && <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>}
                   {item.icon === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></>}
+                  {item.icon === 'folder' && <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>}
+                  {item.icon === 'message-square' && <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>}
+                  {item.icon === 'git-graph' && <><path d="M8 14a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"></path><path d="M20 8v8"></path><path d="M4 8v8"></path></>}
+                  {item.icon === 'clock' && <><path d="M21 12a9 9 0 0 0-9-9v9z"></path><path d="M12 12a7 7 0 0 0-7-7v7z"></path></>}
                   {item.icon === 'folder' && <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>}
                   {item.icon === 'message-square' && <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>}
                   {item.icon === 'git-graph' && <><path d="M8 14a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"></path><path d="M20 8v8"></path><path d="M4 8v8"></path></>}
