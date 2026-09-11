@@ -31,7 +31,6 @@ const emptyForm: CaseForm = {
 
 export const CasesPage = () => {
   const [cases, setCases] = useState<InvestigationCase[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -45,9 +44,9 @@ export const CasesPage = () => {
   const [limit, setLimit] = useState(50);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [showCaseModal, setShowCaseModal] = useState(false);
 
   const loadCases = async (loadPage = page, loadLimit = limit) => {
-    setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
@@ -65,8 +64,6 @@ export const CasesPage = () => {
       setLimit(loadLimit);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load cases');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -179,7 +176,11 @@ export const CasesPage = () => {
           <button
             key={priority}
             type="button"
-            onClick={() => setSelectedPriority(current => current === priority ? null : priority)}
+            onClick={() => {
+              const newPriority = selectedPriority === priority ? null : priority;
+              setSelectedPriority(newPriority);
+              setShowCaseModal(!!newPriority);
+            }}
             className={`card p-4 text-left transition-colors hover:border-accent-cyan ${selectedPriority === priority ? 'border-accent-cyan bg-accent-cyan/10' : ''}`}
             aria-pressed={selectedPriority === priority}
           >
@@ -189,25 +190,34 @@ export const CasesPage = () => {
         ))}
       </div>
 
-      {loading ? <div className="py-10 text-center text-police-400">Loading cases...</div> : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="table min-w-[760px]">
-              <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
-              <tbody>
-                {filteredCases.map((caseItem) => (
-                  <tr key={caseItem.id}>
-                    <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
-                    <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
-                    <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
-                    <td className="text-sm text-police-400">{new Date(caseItem.updatedAt).toLocaleDateString()}</td>
-                    <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {showCaseModal && selectedPriority && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="card w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-police-700">
+              <h2 className="text-xl font-semibold text-white capitalize">{selectedPriority} Priority Cases</h2>
+              <button onClick={() => setShowCaseModal(false)} className="text-police-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="table min-w-[600px]">
+                <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
+                <tbody>
+                  {filteredCases.map((caseItem) => (
+                    <tr key={caseItem.id}>
+                      <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
+                      <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
+                      <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
+                      <td className="text-sm text-police-400">{new Date(caseItem.updatedAt).toLocaleDateString()}</td>
+                      <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t border-police-700 flex justify-between items-center">
+              <p className="text-sm text-police-400">{filteredCases.length} case(s)</p>
+              <button onClick={() => setShowCaseModal(false)} className="btn-secondary px-4 py-2">Close</button>
+            </div>
           </div>
-          {!filteredCases.length && <p className="p-8 text-center text-police-500">No matching cases found.</p>}
         </div>
       )}
 
