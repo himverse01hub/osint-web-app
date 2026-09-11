@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -8,7 +8,6 @@ export const IntelligenceReportPage = () => {
   const { authState } = useAuth();
   const { user } = authState;
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [cases, setCases] = useState<Array<any>>([]);
   const [entities, setEntities] = useState<Array<any>>([]);
   const [relationships, setRelationships] = useState<Array<any>>([]);
@@ -93,7 +92,6 @@ export const IntelligenceReportPage = () => {
     closed: filteredReportEntries.filter(entry => entry.status === 'closed').length,
     total: filteredReportEntries.length,
   };
-  const filteredCases = cases.filter((caseItem: any) => filteredReportEntries.some(entry => entry.type === 'cases' && entry.id === caseItem.id));
 
   const generateReport = useCallback(async (caseId: string) => {
     setGenerating(true);
@@ -337,57 +335,7 @@ export const IntelligenceReportPage = () => {
         </div>
       </div>
 
-      {/* Case Selection */}
-      {!selectedCase && cases.length > 0 && (
-        <div className="card card-hover p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Select a Case</h3>
-          </div>
-          <div className="space-y-4">
-            {filteredCases.map((caseItem: any) => (
-              <div
-                key={caseItem.id}
-                className="flex items-start gap-3 p-4 bg-police-800/50 rounded-lg hover:bg-police-800 transition-colors cursor-pointer"
-                onClick={() => {
-                  setSelectedCase(caseItem);
-                  navigate(`/reports?case=${caseItem.id}`);
-                  generateReport(caseItem.id);
-                }}
-              >
-                <div className="flex-shrink-0">
-                  <div className={`h-4 w-4 rounded-full
-                    ${caseItem.priority === 'critical' ? 'bg-red-500' :
-                    caseItem.priority === 'high' ? 'bg-orange-500' :
-                    caseItem.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'}
-                  `}></div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-white">{caseItem.title}</h4>
-                  <p className="text-police-400 text-sm">
-                    Case #{caseItem.caseNumber} • {caseItem.status} • {caseItem.priority} priority
-                  </p>
-                  <p className="text-police-500 text-xs mt-1">
-                    Assigned to: {caseItem.assignedTo || 'Unassigned'} •
-                    Updated: {new Date(caseItem.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!selectedCase && cases.length === 0 && !generating && (
-        <div className="card card-hover p-6 text-center">
-          <h3 className="text-lg font-semibold text-white mb-2">No Cases Found</h3>
-          <p className="text-police-400">
-            Create a case from the Dashboard or in Settings &gt; Data Management, then link entities to it.
-          </p>
-          <button onClick={() => navigate('/dashboard')} className="btn-primary mt-4">
-            Go to Dashboard
-          </button>
-        </div>
-      )}
+      {/* Case Selection removed */}
 
       {/* Report Generation */}
       {selectedCase && !generating && !generated && (
