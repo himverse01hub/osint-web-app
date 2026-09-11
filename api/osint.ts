@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ExifTool } from 'exiftool-vendored';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
