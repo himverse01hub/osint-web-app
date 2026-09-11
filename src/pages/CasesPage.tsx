@@ -45,6 +45,7 @@ export const CasesPage = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [showCaseModal, setShowCaseModal] = useState(false);
+  const [modalSearch, setModalSearch] = useState('');
 
   const loadCases = async (loadPage = page, loadLimit = limit) => {
     setError('');
@@ -195,27 +196,59 @@ export const CasesPage = () => {
           <div className="card w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-police-700">
               <h2 className="text-xl font-semibold text-white capitalize">{selectedPriority} Priority Cases</h2>
-              <button onClick={() => setShowCaseModal(false)} className="text-police-400 hover:text-white text-2xl">&times;</button>
+              <button onClick={() => { setShowCaseModal(false); setModalSearch(''); }} className="text-police-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div className="p-4 border-b border-police-700">
+              <input
+                type="text"
+                className="input-field w-full"
+                placeholder="Type case number, title, or keyword to search..."
+                value={modalSearch}
+                onChange={(e) => setModalSearch(e.target.value)}
+                autoFocus
+              />
             </div>
             <div className="overflow-x-auto flex-1">
-              <table className="table min-w-[600px]">
-                <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
-                <tbody>
-                  {filteredCases.map((caseItem) => (
-                    <tr key={caseItem.id}>
-                      <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
-                      <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
-                      <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
-                      <td className="text-sm text-police-400">{new Date(caseItem.updatedAt).toLocaleDateString()}</td>
-                      <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {!modalSearch.trim() ? (
+                <div className="p-8 text-center text-police-500">
+                  <p className="text-lg mb-2">No search query</p>
+                  <p className="text-sm">Type above to search for cases</p>
+                </div>
+              ) : (
+                <table className="table min-w-[600px]">
+                  <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
+                  <tbody>
+                    {filteredCases
+                      .filter((caseItem) => {
+                        const search = modalSearch.toLowerCase();
+                        return [
+                          caseItem.caseNumber,
+                          caseItem.title,
+                          caseItem.description,
+                          caseItem.status,
+                          caseItem.priority,
+                        ].some((value) => String(value ?? '').toLowerCase().includes(search));
+                      })
+                      .map((caseItem) => (
+                        <tr key={caseItem.id}>
+                          <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
+                          <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
+                          <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
+                          <td className="text-sm text-police-400">{new Date(caseItem.updatedAt).toLocaleDateString()}</td>
+                          <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             <div className="p-4 border-t border-police-700 flex justify-between items-center">
-              <p className="text-sm text-police-400">{filteredCases.length} case(s)</p>
-              <button onClick={() => setShowCaseModal(false)} className="btn-secondary px-4 py-2">Close</button>
+              <p className="text-sm text-police-400">
+                {modalSearch.trim()
+                  ? `${filteredCases.filter((caseItem) => [caseItem.caseNumber, caseItem.title, caseItem.description, caseItem.status, caseItem.priority].some((value) => String(value ?? '').toLowerCase().includes(modalSearch.toLowerCase()))).length} matching case(s)`
+                  : `${cases.filter((caseItem) => caseItem.priority === selectedPriority).length} total case(s)`}
+              </p>
+              <button onClick={() => { setShowCaseModal(false); setModalSearch(''); }} className="btn-secondary px-4 py-2">Close</button>
             </div>
           </div>
         </div>
