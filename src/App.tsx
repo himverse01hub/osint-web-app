@@ -15,14 +15,11 @@ import CasesPage from './pages/CasesPage';
 import CaseDetailPage from './pages/CaseDetailPage';
 import EntityActivitiesPage from './pages/EntityActivitiesPage';
 import OSTINToolsPage from './pages/OSTINToolsPage';
-import SearchHistoryPage from './pages/SearchHistoryPage';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-
 function App() {
   const { authState } = useAuth();
   const { isAuthenticated, isLoading, user } = authState;
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-police-950">
@@ -38,11 +35,9 @@ function App() {
       </div>
     );
   }
-
   if (!isAuthenticated) {
     return <LoginPage />;
   }
-
   return (
     <div className="min-h-screen flex flex-col bg-police-950">
       <Header user={user} />
@@ -58,7 +53,6 @@ function App() {
               <Route path="/case/:caseId" element={<CaseDetailPage />} />
               <Route path="/search" element={<OSINTSearchPage />} />
               <Route path="/osint-tools" element={<OSTINToolsPage />} />
-              <Route path="/search-history" element={<SearchHistoryPage />} />
               <Route path="/profile" element={<OSINTSearchPage />} />
               <Route path="/profile/:entityId" element={<SuspectProfilePage />} />
               <Route path="/assistant" element={<AIAssistantPage />} />
@@ -77,5 +71,4 @@ function App() {
     </div>
   );
 }
-
 export default App;

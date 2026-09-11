@@ -12,7 +12,6 @@ export const Sidebar = () => {
     { icon: 'message-square', label: 'AI Assistant', path: '/assistant' },
     { icon: 'git-graph', label: 'Knowledge Graph', path: '/graph' },
     { icon: 'file-text', label: 'Reports', path: '/reports' },
-    { icon: 'clock', label: 'Search History', path: '/search-history' },
     { icon: 'settings', label: 'Settings', path: '/settings' },
   ];
 
