@@ -4,7 +4,6 @@ import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
-import { isDatabaseConfigured, requireDatabase } from './_lib/db.js';
 
 const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
 
