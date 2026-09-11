@@ -4,11 +4,8 @@ import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const EXIFTOOL_PATH = process.env.EXIFTOOL_PATH || 'C:\\Users\\jagat\\AppData\\Local\\Programs\\ExifTool\\ExifTool.exe';
-
 const exiftool = new ExifTool({
   taskTimeoutMillis: 30000,
-  execPath: EXIFTOOL_PATH,
 });
 
 const maxFileSize = 50 * 1024 * 1024;
