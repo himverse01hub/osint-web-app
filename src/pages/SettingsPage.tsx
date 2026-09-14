@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { MfaSettings } from '../components/MfaSettings';
 import type { User } from '../types/auth';
 import type { EntityType, SourceType } from '../types/osint';
 
@@ -303,6 +304,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
     </div>
     {mode === 'data' && !relationshipOnly && !entityOnly && <Link to="/cases" className="btn-secondary inline-flex px-4 py-2">Back to Investigations</Link>}
     {mode === 'settings' && <div className="border-b border-police-700 py-3 font-medium text-white">Profile & Preferences</div>}
+    {mode === 'settings' && <MfaSettings />}
 
     {tab === 'profile' && (
       <div className="space-y-6">

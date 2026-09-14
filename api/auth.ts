@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
 import { rateLimit } from './_lib/rate-limit.js';
+import { generateSecret, otpauthUri, verifyTotp } from './_lib/totp.js';
 import {
   DEFAULT_PROFILE,
   activeUser,
@@ -25,6 +26,13 @@ const USER_COLUMNS = `
 const USER_ROLES = ['admin', 'investigator', 'analyst', 'supervisor'];
 
 const cleanText = (value: unknown) => String(value ?? '').trim();
+
+/** Best-effort audit trail for MFA lifecycle events (spec §23). */
+const auditMfa = (database: any, userId: string, action: string) =>
+  database`
+    INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, metadata)
+    VALUES (${randomUUID()}, ${userId}, ${action}, 'user', ${userId}, '{"mfa": true}'::jsonb)
+  `.catch(() => undefined);
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   try {
@@ -56,6 +64,105 @@ export default async function handler(request: VercelRequest, response: VercelRe
       }
       setSessionCookie(request, response, 'deleted', 0);
       return response.status(200).json({ success: true });
+    }
+
+    // Unauthenticated: exchanges a short-lived challenge (from login) + TOTP
+    // code for a real session. Challenges are single-use and expire in 5 min.
+    if (url.endsWith('/mfa/verify') && method === 'POST') {
+      const challengeToken = String(request.body?.challengeToken ?? '').trim();
+      const code = String(request.body?.totp ?? '').trim();
+      if (!challengeToken || !code) {
+        return response.status(400).json({ error: 'challengeToken and totp are required' });
+      }
+      const ip = String(request.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown';
+      const gate = rateLimit(`mfa:${ip}`, { limit: 10, windowMs: 60_000 });
+      if (!gate.allowed) {
+        response.setHeader('Retry-After', String(gate.retryAfterSec));
+        return response.status(429).json({ error: 'Too many verification attempts. Please try again shortly.' });
+      }
+      const challenges = await database`
+        SELECT user_id AS "userId", expires_at AS "expiresAt"
+        FROM mfa_challenges WHERE token = ${challengeToken} LIMIT 1
+      `;
+      // Single-use: consume the challenge regardless of the verification result.
+      await database`DELETE FROM mfa_challenges WHERE token = ${challengeToken}`.catch(() => undefined);
+      const challenge = challenges[0];
+      if (!challenge || new Date(challenge.expiresAt).getTime() <= Date.now()) {
+        return response.status(401).json({ error: 'MFA challenge expired. Please sign in again.' });
+      }
+      const rows = await database`
+        SELECT id, email, name, username, role, department, rank, phone,
+               badge_number AS "badgeNumber", mfa_enabled AS "mfaEnabled",
+               mfa_secret AS "mfaSecret", created_at AS "createdAt", last_login AS "lastLogin"
+        FROM users WHERE id = ${challenge.userId} LIMIT 1
+      `;
+      const userRow = rows[0];
+      if (!userRow || !userRow.mfaEnabled || !verifyTotp(userRow.mfaSecret ?? '', code)) {
+        void auditMfa(database, challenge.userId, 'MFA_LOGIN_FAILED').catch(() => undefined);
+        return response.status(401).json({ error: 'Invalid verification code' });
+      }
+      await database`UPDATE users SET last_login = NOW() WHERE id = ${userRow.id}`.catch(() => undefined);
+      await createSession(database, request, response, userRow.id);
+      void auditMfa(database, userRow.id, 'MFA_LOGIN_SUCCESS');
+      return response.status(200).json({ user: toUser(userRow) });
+    }
+
+    if (url.endsWith('/mfa')) {
+      const current = await activeUser(request, database);
+      if (!current) return response.status(401).json({ error: 'Not authenticated' });
+
+      if (method === 'GET') {
+        const rows = await database`SELECT mfa_enabled AS "mfaEnabled" FROM users WHERE id = ${current.id} LIMIT 1`;
+        return response.status(200).json({ mfaEnabled: Boolean(rows[0]?.mfaEnabled) });
+      }
+
+      if (method === 'POST') {
+        const action = String(request.body?.action ?? '').trim();
+        const code = String(request.body?.totp ?? '').trim();
+        const rows = await database`
+          SELECT username, mfa_enabled AS "mfaEnabled", mfa_secret AS "mfaSecret"
+          FROM users WHERE id = ${current.id} LIMIT 1
+        `;
+        const row = rows[0];
+        if (!row) return response.status(404).json({ error: 'User not found' });
+
+        if (action === 'setup') {
+          const secret = generateSecret();
+          await database`
+            UPDATE users SET mfa_secret = ${secret}, mfa_enabled = false, mfa_enrolled_at = NULL
+            WHERE id = ${current.id}
+          `;
+          return response.status(200).json({ secret, otpauthUri: otpauthUri(secret, row.username || current.id) });
+        }
+
+        if (action === 'enable') {
+          if (!row.mfaSecret) return response.status(400).json({ error: 'Run setup first to generate a secret' });
+          if (row.mfaEnabled) return response.status(400).json({ error: 'MFA is already enabled' });
+          if (!verifyTotp(row.mfaSecret, code)) {
+            return response.status(400).json({ error: 'Invalid verification code — check your authenticator and try again' });
+          }
+          await database`UPDATE users SET mfa_enabled = true, mfa_enrolled_at = NOW() WHERE id = ${current.id}`;
+          void auditMfa(database, current.id, 'MFA_ENABLED');
+          return response.status(200).json({ mfaEnabled: true });
+        }
+
+        if (action === 'disable') {
+          if (!row.mfaEnabled) return response.status(400).json({ error: 'MFA is not enabled' });
+          if (!verifyTotp(row.mfaSecret ?? '', code)) {
+            return response.status(400).json({ error: 'Invalid verification code' });
+          }
+          await database`
+            UPDATE users SET mfa_enabled = false, mfa_secret = NULL, mfa_enrolled_at = NULL
+            WHERE id = ${current.id}
+          `;
+          void auditMfa(database, current.id, 'MFA_DISABLED');
+          return response.status(200).json({ mfaEnabled: false });
+        }
+
+        return response.status(400).json({ error: 'action must be setup, enable, or disable' });
+      }
+
+      return response.status(405).json({ error: 'Method not allowed' });
     }
 
     if (url.endsWith('/credentials') && method === 'POST') {
@@ -233,12 +340,23 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
       const rows = await database`
         SELECT id, email, name, username, role, department, rank, phone,
-               badge_number AS "badgeNumber", password_hash AS "passwordHash", created_at AS "createdAt", last_login AS "lastLogin"
+               badge_number AS "badgeNumber", password_hash AS "passwordHash",
+               mfa_enabled AS "mfaEnabled", created_at AS "createdAt", last_login AS "lastLogin"
         FROM users WHERE username = ${username} LIMIT 1
       `;
       const userRow = rows[0];
       if (!userRow || !verifyPassword(password, userRow.passwordHash)) {
         return response.status(401).json({ error: 'Invalid username or password' });
+      }
+      // MFA-enabled accounts never receive a session from credentials alone:
+      // they must complete a short-lived TOTP challenge (spec §22).
+      if (userRow.mfaEnabled) {
+        const challengeToken = randomBytes(32).toString('hex');
+        await database`
+          INSERT INTO mfa_challenges (token, user_id, expires_at)
+          VALUES (${challengeToken}, ${userRow.id}, NOW() + INTERVAL '5 minutes')
+        `;
+        return response.status(200).json({ mfaRequired: true, challengeToken });
       }
       await database`
         UPDATE users SET last_login = NOW() WHERE id = ${userRow.id}

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export const LoginPage = () => {
-  const { login } = useAuth();
+  const { login, verifyMfa } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -11,6 +11,10 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set after credentials pass but MFA is required: login returns a single-use
+  // challenge token that must be exchanged for a session with a TOTP code.
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [totp, setTotp] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -32,7 +36,28 @@ export const LoginPage = () => {
       await login({ username, password });
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      if (err?.mfaRequired && err?.challengeToken) {
+        // Credentials verified — now collect the 6-digit authenticator code.
+        setChallengeToken(err.challengeToken);
+        setTotp('');
+      } else {
+        setError(err.message || 'Login failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await verifyMfa(challengeToken, totp);
+      navigate('/dashboard', { replace: true });
+    } catch (err: any) {
+      setError(err.message || 'Verification failed');
     } finally {
       setLoading(false);
     }
@@ -50,7 +75,50 @@ export const LoginPage = () => {
           <h2 className="text-2xl font-bold text-gradient">Haryana Police OSINT</h2>
           <p className="text-police-400">Intelligence Platform</p>
         </div>
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        {challengeToken ? (
+          <form className="space-y-6" onSubmit={handleMfaSubmit}>
+            <div className="text-center">
+              <p className="text-sm text-police-300">
+                Two-factor authentication is enabled for this account. Enter the 6-digit code from your
+                authenticator app to continue.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="totp" className="block text-sm font-medium text-police-300 mb-2">
+                Verification code
+              </label>
+              <input
+                id="totp"
+                type="text"
+                required
+                autoFocus
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                autoComplete="one-time-code"
+                className="input-field w-full text-center text-2xl tracking-[0.5em] font-mono"
+                value={totp}
+                onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+              />
+            </div>
+            <button type="submit" className="btn-primary w-full" disabled={loading || totp.length !== 6}>
+              {loading ? 'Verifying...' : 'Verify and sign in'}
+            </button>
+            <button
+              type="button"
+              className="w-full text-sm text-police-400 hover:text-police-300"
+              onClick={() => {
+                setChallengeToken(null);
+                setTotp('');
+                setError(null);
+              }}
+            >
+              ← Back to sign in
+            </button>
+          </form>
+        ) : (
+          <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-police-300 mb-2">
               Username
@@ -119,7 +187,8 @@ export const LoginPage = () => {
               {error}
             </div>
           )}
-        </form>
+          </form>
+        )}
         <div className="text-center text-police-500 text-sm">
           <p>
             This is a secured system. Access is restricted to authorised personnel only.

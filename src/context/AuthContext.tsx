@@ -5,11 +5,13 @@ import { AuthState } from '../types/auth';
 const AuthContext = createContext<{
   authState: AuthState
   login: (credentials: { username: string; password: string }) => Promise<void>
+  verifyMfa: (challengeToken: string, totp: string) => Promise<void>
   logout: () => Promise<void>
   reloadUser: () => Promise<void>
 }>({
   authState: { user: null, isAuthenticated: false, isLoading: true },
   login: async () => {},
+  verifyMfa: async () => {},
   logout: async () => {},
   reloadUser: async () => {},
 })
@@ -61,6 +63,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!response.ok) {
         throw new Error(data.error || 'Login failed')
       }
+      // MFA-enabled accounts get a challenge instead of a session; the login
+      // page catches this and collects a TOTP code via verifyMfa().
+      if (data.mfaRequired) {
+        const challengeError = new Error('mfa-required') as Error & { mfaRequired?: boolean; challengeToken?: string }
+        challengeError.mfaRequired = true
+        challengeError.challengeToken = data.challengeToken
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false })
+        throw challengeError
+      }
+      setAuthState({ user: data.user ?? null, isAuthenticated: Boolean(data.user), isLoading: false })
+    } catch (error) {
+      if ((error as Error & { mfaRequired?: boolean }).mfaRequired) throw error
+      setAuthState({ user: null, isAuthenticated: false, isLoading: false })
+      throw error
+    }
+  }
+
+  const verifyMfa = async (challengeToken: string, totp: string) => {
+    setAuthState(prev => ({ ...prev, isLoading: true }))
+    try {
+      const response = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken, totp }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification failed')
+      }
       setAuthState({ user: data.user ?? null, isAuthenticated: Boolean(data.user), isLoading: false })
     } catch (error) {
       setAuthState({ user: null, isAuthenticated: false, isLoading: false })
@@ -104,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ authState, login, logout, reloadUser }}>
+    <AuthContext.Provider value={{ authState, login, verifyMfa, logout, reloadUser }}>
       {children}
     </AuthContext.Provider>
   )

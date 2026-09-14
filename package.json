@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "db:migrate": "node db/run-migration.mjs"
+    "db:migrate": "node db/run-migration.mjs",
+    "db:retention": "node db/retention.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

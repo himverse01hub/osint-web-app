@@ -1,0 +1,98 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Haryana Police OSINT Intelligence Platform API",
+    "version": "1.0.0",
+    "description": "HP-OI REST API. All endpoints require an authenticated session cookie except /auth/login and /auth/mfa/verify. RBAC permissions are enforced server-side; every state-changing action is audit-logged. OSINT findings are intelligence leads and must be independently verified before operational or legal action."
+  },
+  "servers": [{ "url": "/api" }],
+  "tags": [
+    { "name": "auth" }, { "name": "dashboard" }, { "name": "cases" }, { "name": "entities" },
+    { "name": "relationships" }, { "name": "search" }, { "name": "alerts" }, { "name": "evidence" },
+    { "name": "audit" }, { "name": "dark-web" }, { "name": "assistant" }, { "name": "osint" }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Sign in (rate limited: 10/min per username, 30/min per IP; 429 carries Retry-After)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["username", "password"], "properties": { "username": { "type": "string" }, "password": { "type": "string" } } } } } },
+        "responses": {
+          "200": { "description": "Session cookie set — or body { mfaRequired: true, challengeToken } when TOTP is enabled" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/auth/mfa/verify": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Exchange single-use MFA challenge + TOTP code for a session",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["challengeToken", "totp"], "properties": { "challengeToken": { "type": "string" }, "totp": { "type": "string", "pattern": "^[0-9]{6}$" } } } } } },
+        "responses": { "200": { "description": "Session established; returns user" }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/mfa": {
+      "get": { "tags": ["auth"], "summary": "MFA status for the signed-in user", "responses": { "200": { "description": "{ mfaEnabled }" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "post": {
+        "tags": ["auth"],
+        "summary": "Setup / enable / disable TOTP (RFC 6238, base32 secret)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["setup", "enable", "disable"] }, "totp": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "setup → { secret, otpauthUri }; enable/disable → { mfaEnabled }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/me": { "get": { "tags": ["auth"], "summary": "Current user profile", "responses": { "200": { "description": "{ user }" }, "401": { "$ref": "#/components/responses/Error" } } } },
+    "/auth/logout": { "post": { "tags": ["auth"], "summary": "Destroy session", "responses": { "200": { "description": "Session cookie cleared" } } } },
+    "/dashboard": { "get": { "tags": ["dashboard"], "summary": "Command-center aggregates (active cases, alerts, findings)", "responses": { "200": { "description": "Dashboard widget data" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
+    "/cases": {
+      "get": { "tags": ["cases"], "summary": "List investigation cases (filter: status, priority, district, q)", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "q", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "{ cases: Case[], total, page, totalPages }" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["cases"], "summary": "Create case (case.create permission)", "responses": { "201": { "description": "{ case: Case }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/entities": {
+      "get": { "tags": ["entities"], "summary": "List entities (type filter, pagination) or fetch one with relationships (?id=)", "responses": { "200": { "description": "{ entities: Entity[], relationships, total, page, totalPages } or { entity, relationships }" }, "404": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["entities"], "summary": "Create entity (type, value, label, source, confidence 0-100)", "responses": { "201": { "description": "{ entity: Entity }" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "patch": { "tags": ["entities"], "summary": "Update entity (?id=) — investigator-confirmed merges only", "responses": { "200": { "description": "{ entity: Entity }" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["entities"], "summary": "Delete entity (?id=, admin roles)", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/search": {
+      "get": { "tags": ["search"], "summary": "Global OSINT search across local DB + lawful public sources (OSM, Wikidata, Wikipedia, GDELT, threat intel)", "parameters": [{ "name": "value", "in": "query", "required": true, "schema": { "type": "string" } }, { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["all", "person", "phone", "email", "username", "organization", "crypto_wallet", "location"] } }, { "name": "threatIntel", "in": "query", "schema": { "type": "string", "enum": ["on", "off"] } }], "responses": { "200": { "description": "{ results: Entity[], totalCount, sources, sourceErrors }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/relationships": {
+      "get": { "tags": ["relationships"], "summary": "Relationship edges for link analysis (?entityId= or full graph)", "responses": { "200": { "description": "{ relationships: [{ sourceId, targetId, type, confidence, discoveredAt }] }" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["relationships"], "summary": "Create relationship edge with source attribution + confidence", "responses": { "201": { "description": "{ relationship }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/evidence": {
+      "get": { "tags": ["evidence"], "summary": "List evidence (optional ?caseId=)", "responses": { "200": { "description": "{ evidence: EvidenceItem[] }" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["evidence"], "summary": "Register evidence — server-side SHA-256 (contentBase64) or client digest, 10 MB cap, malware-scan hook, custody chain seeded", "responses": { "201": { "description": "{ evidence: EvidenceItem }" }, "400": { "$ref": "#/components/responses/Error" }, "413": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "patch": { "tags": ["evidence"], "summary": "Append chain-of-custody action (?id=; collected|transferred|sealed|accessed|verified) — append-only", "responses": { "200": { "description": "{ evidence: EvidenceItem }" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/alerts": {
+      "get": { "tags": ["alerts"], "summary": "List alerts (filter: severity, acknowledged)", "responses": { "200": { "description": "{ alerts: [...] }" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "patch": { "tags": ["alerts"], "summary": "Acknowledge alert (?id=)", "responses": { "200": { "description": "{ alert }" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/audit-logs": {
+      "get": { "tags": ["audit"], "summary": "Immutable audit trail (audit.view permission; filter: action, user, date range)", "responses": { "200": { "description": "{ logs: [...], total }" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/dark-web": {
+      "get": { "tags": ["threat-intel"], "summary": "Monitored dark-web indicator feed (lawful threat-intel sources only)", "responses": { "200": { "description": "{ indicators: [...] }" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/assistant": {
+      "post": { "tags": ["assistant"], "summary": "HP Intelligence Copilot — summarize/analyze with FACT|SOURCE|INFERENCE|HYPOTHESIS labels + evidence IDs", "responses": { "200": { "description": "{ answer, labels, evidenceRefs }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/osint": {
+      "post": { "tags": ["osint"], "summary": "Image intelligence — upload (base64), EXIF/metadata extraction, server-side SHA-256", "responses": { "200": { "description": "{ hash, exif, metadata }" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": { "sessionCookie": { "type": "apiKey", "in": "cookie", "name": "hp_osint_session" } },
+    "responses": { "Error": { "description": "Error envelope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } },
+    "schemas": {
+      "Error": { "type": "object", "properties": { "error": { "type": "string" } } },
+      "User": { "type": "object", "properties": { "id": { "type": "string" }, "username": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string", "enum": ["ADMIN", "SUPER_ADMIN", "INVESTIGATOR", "ANALYST", "SUPERVISOR", "READ_ONLY"] }, "mfaEnabled": { "type": "boolean" } } },
+      "Entity": { "type": "object", "properties": { "id": { "type": "string" }, "type": { "type": "string" }, "value": { "type": "string" }, "label": { "type": "string" }, "confidence": { "type": "integer", "minimum": 0, "maximum": 100 }, "source": { "type": "string" }, "sourceName": { "type": "string" }, "sourceUrl": { "type": "string" }, "discoveredAt": { "type": "string", "format": "date-time" }, "verified": { "type": "boolean" }, "tags": { "type": "array", "items": { "type": "string" } }, "metadata": { "type": "object" } } },
+      "Case": { "type": "object", "properties": { "id": { "type": "string" }, "firReference": { "type": "string" }, "policeStation": { "type": "string" }, "district": { "type": "string" }, "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }, "status": { "type": "string", "enum": ["OPEN", "UNDER INVESTIGATION", "ON HOLD", "CLOSED"] } } },
+      "EvidenceItem": { "type": "object", "properties": { "id": { "type": "string" }, "caseId": { "type": "string" }, "evidenceType": { "type": "string" }, "title": { "type": "string" }, "sha256": { "type": "string" }, "source": { "type": "string" }, "collectedBy": { "type": "string" }, "scanStatus": { "type": "string", "enum": ["pending", "clean", "flagged"] }, "chainOfCustody": { "type": "array", "items": { "type": "object", "properties": { "action": { "type": "string" }, "by": { "type": "string" }, "at": { "type": "string", "format": "date-time" }, "note": { "type": "string" } } } } } }
+    }
+  },
+  "security": [{ "sessionCookie": [] }]
+}
