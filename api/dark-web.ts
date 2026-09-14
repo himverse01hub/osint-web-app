@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 const allowedSeverities = new Set(['low', 'medium', 'high', 'critical']);
 const allowedStatuses = new Set(['open', 'investigating', 'resolved']);
@@ -28,6 +29,8 @@ const toMention = (row: any) => ({
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: 'darkweb.view' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
 
     if (request.method === 'GET') {
       const page = Math.max(1, parseInt(String(request.query.page || '1'), 10));

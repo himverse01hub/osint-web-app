@@ -16,22 +16,45 @@ export const DEFAULT_PROFILE = {
   rank: 'Inspector',
 };
 
-const PERMISSIONS = [
-  'dashboard.view',
-  'search.execute',
-  'profile.view',
-  'profile.edit',
-  'graph.view',
-  'graph.edit',
-  'darkweb.view',
-  'reports.generate',
-  'reports.export',
-  'alerts.view',
-  'alerts.manage',
-  'audit.view',
-  'settings.manage',
-  'users.manage',
-];
+/** Role -> permission tiers (spec §22). Least privilege: unknown roles fall back to read_only. */
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  read_only: [
+    'dashboard.view', 'search.execute', 'profile.view', 'graph.view',
+    'alerts.view', 'cases.view', 'evidence.view',
+  ],
+  analyst: [
+    'dashboard.view', 'search.execute', 'profile.view', 'profile.edit', 'graph.view', 'graph.edit',
+    'alerts.view', 'cases.view', 'cases.edit', 'evidence.view', 'evidence.edit',
+    'reports.generate', 'darkweb.view',
+  ],
+  investigator: [
+    'dashboard.view', 'search.execute', 'profile.view', 'profile.edit', 'graph.view', 'graph.edit',
+    'alerts.view', 'alerts.manage', 'cases.view', 'cases.edit', 'evidence.view', 'evidence.edit',
+    'reports.generate', 'reports.export', 'darkweb.view',
+  ],
+  supervisor: [
+    'dashboard.view', 'search.execute', 'profile.view', 'profile.edit', 'graph.view', 'graph.edit',
+    'alerts.view', 'alerts.manage', 'cases.view', 'cases.edit', 'evidence.view', 'evidence.edit',
+    'reports.generate', 'reports.export', 'darkweb.view', 'audit.view',
+  ],
+  admin: [
+    'dashboard.view', 'search.execute', 'profile.view', 'profile.edit', 'graph.view', 'graph.edit',
+    'alerts.view', 'alerts.manage', 'cases.view', 'cases.edit', 'evidence.view', 'evidence.edit',
+    'reports.generate', 'reports.export', 'darkweb.view', 'audit.view',
+    'settings.manage', 'users.manage',
+  ],
+  super_admin: [
+    'dashboard.view', 'search.execute', 'profile.view', 'profile.edit', 'graph.view', 'graph.edit',
+    'alerts.view', 'alerts.manage', 'cases.view', 'cases.edit', 'evidence.view', 'evidence.edit',
+    'reports.generate', 'reports.export', 'darkweb.view', 'audit.view',
+    'settings.manage', 'users.manage',
+  ],
+};
+
+export function normalizeRole(role: unknown): string {
+  const value = String(role ?? '').trim().toLowerCase();
+  return ROLE_PERMISSIONS[value] ? value : 'read_only';
+}
 
 export function toUser(row: any) {
   return {
@@ -41,11 +64,11 @@ export function toUser(row: any) {
     username: row.username ?? undefined,
     badgeNumber: row.badgeNumber ?? row.badge_number ?? 'HP-2024-0087',
     phone: row.phone ?? '',
-    role: row.role ?? 'investigator',
+    role: normalizeRole(row.role),
     department: row.department ?? undefined,
     rank: row.rank ?? undefined,
     lastLogin: row.lastLogin ? new Date(row.lastLogin).toISOString() : new Date().toISOString(),
-    permissions: PERMISSIONS,
+    permissions: ROLE_PERMISSIONS[normalizeRole(row.role)],
   };
 }
 

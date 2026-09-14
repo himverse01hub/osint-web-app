@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'GET') {
@@ -8,6 +9,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: 'dashboard.view' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
     const [entityRows, relationshipRows, caseRows, alertRows] = await Promise.all([
       database`
         SELECT type, COUNT(*)::int AS count

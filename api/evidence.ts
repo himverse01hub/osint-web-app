@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 const allowedTypes = new Set(['image', 'video', 'pdf', 'document', 'screenshot', 'webpage', 'text', 'hash', 'url']);
 const maxEvidenceBytes = 10_000_000;
@@ -53,6 +54,8 @@ const toEvidence = (row: any) => ({
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: request.method === 'GET' ? 'evidence.view' : 'evidence.edit' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
 
     if (request.method === 'GET') {
       const caseId = String(request.query.caseId ?? '').trim();

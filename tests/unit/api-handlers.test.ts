@@ -20,7 +20,7 @@ const makeRequest = (options: { method?: string; query?: Record<string, string>;
     url: '/api/test',
     query: options.query ?? {},
     body: options.body,
-    headers: {},
+    headers: { cookie: 'hp_osint_session=tok123' },
   }) as unknown as VercelRequest;
 
 const makeResponse = () => {
@@ -63,8 +63,22 @@ const entityRow = {
   metadata: { tags: ['demo'], phone: '+91-90000-00000' },
 };
 
+const sessionUser = {
+  id: 'u1',
+  name: 'Demo Officer',
+  email: 'demo@haryanapolice.gov.in',
+  username: 'demo_officer',
+  role: 'investigator',
+  department: null,
+  rank: null,
+  phone: '',
+  badge_number: 'HP-1',
+  lastLogin: null,
+};
+
 const entitiesDb = (options: { idRows?: unknown[]; metadataRows?: unknown[]; deleteRows?: unknown[] } = {}) =>
   fakeDb((query) => {
+    if (query.includes('FROM sessions')) return [sessionUser];
     if (query.includes('COUNT(*)')) return [{ total: '1' }];
     if (query.includes('SELECT metadata FROM entities')) return options.metadataRows ?? [{ metadata: { tags: ['old'] } }];
     if (query.includes('INSERT INTO entities')) return [entityRow];
@@ -191,7 +205,7 @@ describe('search handler', () => {
   const jsonResponse = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload });
 
   it('rejects missing value with 400 and unknown methods with 405', async () => {
-    dbState.impl = fakeDb(() => []);
+    dbState.impl = fakeDb((query) => (query.includes('FROM sessions') ? [sessionUser] : []));
     const empty = makeResponse();
     await searchHandler(makeRequest({ query: {} }), empty.response);
     expect(empty.state.status).toBe(400);
@@ -206,6 +220,7 @@ describe('search handler', () => {
     let upserts = 0;
     let searchRuns = 0;
     dbState.impl = fakeDb((query) => {
+      if (query.includes('FROM sessions')) return [sessionUser];
       if (query.includes('FROM entities') && query.includes('ILIKE')) return [entityRow];
       if (query.includes('INSERT INTO search_runs')) {
         searchRuns += 1;
@@ -251,6 +266,7 @@ describe('search handler', () => {
 
   it('keeps searching when a provider fails and reports the source error', async () => {
     dbState.impl = fakeDb((query) => {
+      if (query.includes('FROM sessions')) return [sessionUser];
       if (query.includes('FROM entities') && query.includes('ILIKE')) return [];
       if (query.includes('INSERT INTO')) return [];
       return [];
@@ -274,6 +290,7 @@ describe('search handler', () => {
 
   it('routes IPv4 values to the threat-intel provider and maps the entity', async () => {
     dbState.impl = fakeDb((query) => {
+      if (query.includes('FROM sessions')) return [sessionUser];
       if (query.includes('FROM entities') && query.includes('ILIKE')) return [];
       if (query.includes('INSERT INTO')) return [];
       return [];

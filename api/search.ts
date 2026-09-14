@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 type SearchType = 'person' | 'phone' | 'email' | 'username' | 'organization' | 'crypto_wallet' | 'location' | 'all';
 
@@ -329,6 +330,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (request.method !== 'GET') {
     return response.status(405).json({ error: 'Method not allowed' });
   }
+
+  const auth = await requireAuth(request, requireDatabase(), { permission: 'search.execute' })
+    .catch(() => ({ ok: false as const, status: 503 as const, error: 'Search is unavailable' }));
+  if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
 
   const type = String(request.query.type || 'all') as SearchType;
   const value = String(request.query.value || '').trim();

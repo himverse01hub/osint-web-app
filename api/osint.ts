@@ -1,6 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
+  const auth = await requireAuth(request, requireDatabase(), { permission: 'search.execute' })
+    .catch(() => ({ ok: false as const, status: 503 as const, error: 'OSINT tools are unavailable' }));
+  if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
+
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' });
   }

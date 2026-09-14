@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 const allowedSeverities = new Set(['low', 'medium', 'high', 'critical']);
 
@@ -22,6 +23,8 @@ const toAlert = (row: any) => ({
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: request.method === 'GET' ? 'alerts.view' : 'alerts.manage' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
 
     if (request.method === 'POST') {
       const body = request.body ?? {};

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 const allowedTypes = new Set([
   'person', 'phone', 'email', 'username', 'organization', 'location',
@@ -39,6 +40,8 @@ const toEntity = (row: any) => ({
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: request.method === 'GET' ? 'graph.view' : 'graph.edit' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
 
     if (request.method === 'GET') {
       const id = String(request.query.id ?? '').trim();

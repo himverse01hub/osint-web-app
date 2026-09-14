@@ -104,13 +104,13 @@ describe('toUser (DB row → API user)', () => {
     expect(user).toMatchObject({
       id: 'u1',
       badgeNumber: 'HP-1',
-      role: 'investigator',
+      role: 'read_only', // unknown/legacy roles degrade to least privilege
       phone: '',
       username: undefined,
       lastLogin: '2026-09-01T10:00:00.000Z',
     });
     expect(user.permissions).toContain('search.execute');
-    expect(user.permissions).toContain('audit.view');
+    expect(user.permissions).not.toContain('audit.view');
   });
 
   it('prefers camelCase badgeNumber and falls back to the service default', () => {

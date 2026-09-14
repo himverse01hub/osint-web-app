@@ -20,7 +20,7 @@ const makeRequest = (options: { method?: string; query?: Record<string, string>;
     url: '/api/evidence',
     query: options.query ?? {},
     body: options.body,
-    headers: {},
+    headers: { cookie: 'hp_osint_session=tok123' },
   }) as unknown as VercelRequest;
 
 const makeResponse = () => {
@@ -52,10 +52,12 @@ const fakeDb = (route: (query: string) => unknown): any => {
 const evidenceDb = () => {
   const calls: { q: string; values: unknown[] }[] = [];
   const rows = {
+    session: [{ id: 'u1', name: 'Demo Officer', email: 'demo@haryanapolice.gov.in', role: 'investigator', username: 'demo_officer', badge_number: 'HP-1', phone: '', department: null, rank: null, lastLogin: null }],
     insert: [{ id: 'ev1', caseId: 'c1', evidenceType: 'image', title: 'Screenshot', description: null, sha256: 'x', source: 'web', sourceUrl: null, collectedBy: 'Investigator', fileName: null, mimeType: null, sizeBytes: 11, scanStatus: 'pending', chainOfCustody: [], createdAt: '2026-09-14T00:00:00Z', updatedAt: '2026-09-14T00:00:00Z' }],
     existing: [{ chainOfCustody: [{ action: 'collected', by: 'Investigator', at: '2026-09-14T00:00:00Z' }] }],
   };
   const route = (query: string) => {
+    if (query.includes('FROM sessions')) return rows.session;
     if (query.includes('INSERT INTO evidence')) return rows.insert;
     if (query.includes('UPDATE evidence')) return rows.insert;
     if (query.includes('SELECT chain_of_custody')) return rows.existing;

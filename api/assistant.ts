@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireDatabase } from './_lib/db.js';
+import { requireAuth } from './_lib/guard.js';
 
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'to', 'of', 'for', 'with', 'and', 'or', 'in', 'on', 'at',
@@ -25,6 +26,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   try {
     const database = requireDatabase();
+    const auth = await requireAuth(request, database, { permission: 'search.execute' });
+    if (!auth.ok) return response.status(auth.status).json({ error: auth.error });
     const body = request.body ?? {};
     const query = String(body.query ?? request.query.q ?? '').trim();
     const contextEntityId = body.contextEntityId ? String(body.contextEntityId) : undefined;
