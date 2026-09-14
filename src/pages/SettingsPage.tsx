@@ -389,6 +389,19 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
           )}
         </section>
         <section className="card p-6">
+          <h2 className="mb-2 text-lg font-semibold text-white">My Profile</h2>
+          <p className="mb-4 text-sm text-police-400">Shown in the header and on reports. Saving also refreshes your session.</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <input className="input-field" placeholder="Full name" value={profile.name} onChange={event => setProfile({ ...profile, name: event.target.value })} />
+            <input className="input-field" type="email" placeholder="Email" value={profile.email} onChange={event => setProfile({ ...profile, email: event.target.value })} />
+            <input className="input-field" placeholder="Department" value={profile.department} onChange={event => setProfile({ ...profile, department: event.target.value })} />
+            <input className="input-field" placeholder="Rank" value={profile.rank} onChange={event => setProfile({ ...profile, rank: event.target.value })} />
+            <input className="input-field" placeholder="Phone" value={profile.phone} onChange={event => setProfile({ ...profile, phone: event.target.value })} />
+            <input className="input-field" placeholder="Badge number" value={profile.badgeNumber} onChange={event => setProfile({ ...profile, badgeNumber: event.target.value })} />
+          </div>
+          <button type="button" className="btn-secondary mt-4 px-5 py-2" onClick={() => { void saveProfile(); }}>Save my profile</button>
+        </section>
+        <section className="card p-6">
           <h2 className="mb-2 text-lg font-semibold text-white">Change My Password</h2>
           <p className="mb-4 text-sm text-police-400">Update the password for your own account ({user?.username || 'current user'}). Other devices are signed out automatically.</p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

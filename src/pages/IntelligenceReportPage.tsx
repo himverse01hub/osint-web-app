@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 
 export const IntelligenceReportPage = () => {
   const { authState } = useAuth();
@@ -328,8 +326,13 @@ export const IntelligenceReportPage = () => {
 
   const exportToPDF = async (report = reportContent) => {
     if (!report) return;
-    const element = document.createElement('div');
-    element.innerHTML = `
+    try {
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
+      const element = document.createElement('div');
+      element.innerHTML = `
       <div style="font-family:Arial,sans-serif;color:#172033;padding:24px;">
         <h1 style="color:#126782;margin:0 0 16px;">${report.title}</h1>
         <p><strong>Report ID:</strong> ${report.id}</p>
@@ -344,20 +347,22 @@ export const IntelligenceReportPage = () => {
         ${report.content.investigativeLeads.map((lead: any) => `<h3>${lead.title}</h3><p>${lead.description}</p>`).join('')}
       </div>
     `;
-    document.body.appendChild(element);
-    try {
-      const canvas = await html2canvas(element);
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Haryana_Police_Report_${report.id}.pdf`);
+      document.body.appendChild(element);
+      try {
+        const canvas = await html2canvas(element);
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Haryana_Police_Report_${report.id}.pdf`);
+      } finally {
+        document.body.removeChild(element);
+      }
     } catch (error) {
       console.error('PDF export failed:', error);
-    } finally {
-      document.body.removeChild(element);
+      setLoadError(error instanceof Error ? error.message : 'PDF export failed');
     }
   };
 

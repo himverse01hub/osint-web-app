@@ -140,12 +140,9 @@ export const CasesPage = () => {
     setAppliedQuery('');
   };
 
-  const filteredCases = cases.filter((caseItem) => {
-    const searchText = appliedQuery.trim().toLowerCase();
-    const matchesSearch = !searchText || [caseItem.caseNumber, caseItem.title, caseItem.description]
-      .some((value) => String(value ?? '').toLowerCase().includes(searchText));
-    return matchesSearch;
-  });
+  const searchText = appliedQuery.trim().toLowerCase();
+  const visibleCases = cases.filter((caseItem) => !searchText || [caseItem.caseNumber, caseItem.title, caseItem.description]
+    .some((value) => String(value ?? '').toLowerCase().includes(searchText)));
 
   return (
     <div className="space-y-6">
@@ -186,7 +183,7 @@ export const CasesPage = () => {
             aria-pressed={selectedPriority === priority}
           >
             <p className="capitalize text-police-400">{priority}</p>
-            <p className="mt-1 text-2xl font-bold text-white">{cases.filter((caseItem) => caseItem.priority === priority).length}</p>
+            <p className="mt-1 text-2xl font-bold text-white">{visibleCases.filter((caseItem) => caseItem.priority === priority).length}</p>
           </button>
         ))}
       </div>
@@ -209,26 +206,51 @@ export const CasesPage = () => {
               />
             </div>
             <div className="overflow-x-auto flex-1">
-              {!modalSearch.trim() ? (
-                <div className="p-8 text-center text-police-500">
-                  <p className="text-lg mb-2">No search query</p>
-                  <p className="text-sm">Type above to search for cases</p>
-                </div>
-              ) : (
+              {(() => {
+                const search = modalSearch.trim().toLowerCase();
+                const pool = selectedPriority === null
+                  ? []
+                  : visibleCases.filter((caseItem) => caseItem.priority === selectedPriority);
+                const visible = search
+                  ? pool.filter((caseItem) => [
+                      caseItem.caseNumber,
+                      caseItem.title,
+                      caseItem.description,
+                      caseItem.status,
+                      caseItem.priority,
+                    ].some((value) => String(value ?? '').toLowerCase().includes(search)))
+                  : pool;
+                if (selectedPriority === null) {
+                  return (
+                    <div className="p-8 text-center text-police-500">
+                      <p className="text-lg mb-2">No priority selected</p>
+                      <p className="text-sm">Choose a priority card to view cases</p>
+                    </div>
+                  );
+                }
+                if (!search) {
+                  return (
+                    <table className="table min-w-[600px]">
+                      <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
+                      <tbody>
+                        {visible.map((caseItem) => (
+                          <tr key={caseItem.id}>
+                            <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
+                            <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
+                            <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
+                            <td className="text-sm text-police-400" title={new Date(caseItem.updatedAt).toISOString()}>{new Date(caseItem.updatedAt).toLocaleString()}</td>
+                            <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                }
+                return (
                 <table className="table min-w-[600px]">
                   <thead><tr><th>Case</th><th>Status</th><th>Priority</th><th>Updated</th><th className="text-right">Actions</th></tr></thead>
                   <tbody>
-                    {filteredCases
-                      .filter((caseItem) => {
-                        const search = modalSearch.toLowerCase();
-                        return [
-                          caseItem.caseNumber,
-                          caseItem.title,
-                          caseItem.description,
-                          caseItem.status,
-                          caseItem.priority,
-                        ].some((value) => String(value ?? '').toLowerCase().includes(search));
-                      })
+                    {visible
                       .map((caseItem) => (
                         <tr key={caseItem.id}>
                           <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
@@ -240,13 +262,21 @@ export const CasesPage = () => {
                       ))}
                   </tbody>
                 </table>
-              )}
+                );
+              })()}
             </div>
             <div className="p-4 border-t border-police-700 flex justify-between items-center">
               <p className="text-sm text-police-400">
-                {modalSearch.trim()
-                  ? `${filteredCases.filter((caseItem) => [caseItem.caseNumber, caseItem.title, caseItem.description, caseItem.status, caseItem.priority].some((value) => String(value ?? '').toLowerCase().includes(modalSearch.toLowerCase()))).length} matching case(s)`
-                  : `${cases.filter((caseItem) => caseItem.priority === selectedPriority).length} total case(s)`}
+                {selectedPriority === null
+                  ? 'Select a priority card to filter cases'
+                  : (() => {
+                      const search = modalSearch.trim().toLowerCase();
+                      const pool = visibleCases.filter((caseItem) => caseItem.priority === selectedPriority);
+                      const visible = search
+                        ? pool.filter((caseItem) => [caseItem.caseNumber, caseItem.title, caseItem.description, caseItem.status, caseItem.priority].some((value) => String(value ?? '').toLowerCase().includes(search)))
+                        : pool;
+                      return search ? `${visible.length} matching case(s)` : `${visible.length} total case(s)`;
+                    })()}
               </p>
               <button onClick={() => { setShowCaseModal(false); setModalSearch(''); }} className="btn-secondary px-4 py-2">Close</button>
             </div>

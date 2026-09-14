@@ -153,6 +153,6 @@ html[data-theme='light'] .text-police-500 { color: #71849a !important; }
   }
 
   .border-gradient {
-    @apply border border-transparent bg-gradient-to-r from-police-700 to-police-800 bg-[length:100%_100%] bg-origin-border-box;
+    @apply border border-transparent bg-gradient-to-r from-police-700 to-police-800 bg-origin-border;
   }
 }

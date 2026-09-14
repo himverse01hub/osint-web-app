@@ -23,5 +23,23 @@ dist-ssr
 *.sln
 *.sw?
 
-.vercel
+# Secrets / env files (also covers .env.local.bak)
 .env*
+!.env.example
+legacy-demo/
+.kilo
+nul
+*.tsbuildinfo
+
+# Vercel build artifacts
+.vercel
+.output
+
+# tsc -b emit artifacts (regenerated locally, never tracked)
+vite.config.js
+vite.config.d.ts
+
+# Generated docs (source of truth lives in REQUIREMENTS.md)
+HARYANA-POLICE-OSINT-DOCS.md
+HARYANA-POLICE-OSINT-USER-GUIDE.md
+docs/

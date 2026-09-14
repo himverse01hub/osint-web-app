@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const ghuntPath = process.env.GHUNT_PATH || 'ghunt';
-
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' });
@@ -41,9 +39,10 @@ async function handleExifTool(request: VercelRequest, response: VercelResponse) 
 
     // Lazy-load piexifjs (CommonJS module) on demand
     const piexif = (await import('piexifjs')).default || (await import('piexifjs'));
+    // piexifjs types the dict with numeric IFD keys; handlers access string IFD names ('0th' | 'Exif' | 'GPS').
+    const exifObj = piexif.load(buffer.toString('binary')) as unknown as Record<string, Record<string, unknown>>;
 
     if (action === 'extract') {
-      const exifObj = piexif.load(buffer.toString('binary'));
       const metadata: Record<string, string> = {};
 
       const tagMap0th: Record<string, string[]> = {

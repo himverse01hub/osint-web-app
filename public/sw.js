@@ -1,7 +1,7 @@
-/* Minimal service worker for Haryana Police OSINT (offline-friendly shell).
+/* Service worker for Haryana Police OSINT (Vite + React production build).
    Strategy: network-first for navigations, cache-first for same-origin GET assets. */
-const CACHE = 'hp-osint-v1';
-const CORE = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest'];
+const CACHE = 'hp-osint-v3';
+const CORE = ['/', '/index.html', '/favicon.svg', '/icons.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

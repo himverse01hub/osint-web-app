@@ -53,9 +53,25 @@ export const AuditLogsPage = () => {
           >
             Refresh
           </button>
-          <button 
+          <button
             onClick={() => {
-              // Export logs
+              const header = 'timestamp,user,action,resource,ip,status,userAgent';
+              const rows = filteredLogs.map((log) => ([
+                new Date(log.timestamp).toISOString(),
+                log.userName,
+                log.action,
+                log.resourceType,
+                String(log.details.ipAddress ?? ''),
+                log.status,
+                typeof log.details.userAgent === 'string' ? log.details.userAgent.replace(/"/g, '""') : '',
+              ].map((cell) => `"${cell}"`).join(',')));
+              const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+              anchor.click();
+              URL.revokeObjectURL(url);
             }}
             className="btn-accent px-4 py-2"
           >

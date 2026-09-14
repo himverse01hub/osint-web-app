@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert } from '../types/osint';
 import { Pagination } from '../components/Pagination';
 
@@ -15,7 +15,7 @@ export const AlertsPage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState<{ total: number; unacknowledged: number; highRisk: number }>({ total: 0, unacknowledged: 0, highRisk: 0 });
 
-  const loadAlerts = async (loadPage = page, loadLimit = limit) => {
+  const loadAlerts = useCallback(async (loadPage = page, loadLimit = limit) => {
     setRefreshing(true);
     try {
       const params = new URLSearchParams();
@@ -25,7 +25,7 @@ export const AlertsPage = () => {
       if (filterType !== 'all') params.set('type', filterType);
       if (acknowledgedFilter === 'acknowledged') params.set('acknowledged', 'true');
       if (acknowledgedFilter === 'unacknowledged') params.set('acknowledged', 'false');
-      
+
       const response = await fetch(`/api/alerts?${params.toString()}`);
       if (!response.ok) throw new Error('Alerts request failed');
       const data = await response.json();
@@ -41,19 +41,19 @@ export const AlertsPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [acknowledgedFilter, filterSeverity, filterType, limit, page]);
 
   useEffect(() => {
     void loadAlerts(1, limit);
-  }, [filterSeverity, filterType, acknowledgedFilter]);
-
-  useEffect(() => {
-    void loadAlerts();
-  }, [loadAlerts]);
+  }, [filterSeverity, filterType, acknowledgedFilter, limit, loadAlerts]);
 
   const acknowledgeAlert = async (id: string) => {
-    const response = await fetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
-    if (response.ok) void loadAlerts();
+    try {
+      const response = await fetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
+      if (response.ok) void loadAlerts();
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+    }
   };
 
   const filteredAlerts = alerts.filter(alert => {
@@ -250,10 +250,8 @@ export const AlertsPage = () => {
                     </div>
                   )}
                   {!alert.acknowledgedAt && (
-                    <button 
-                      onClick={() => {
-                        // Acknowledge alert
-                      }}
+                    <button
+                      onClick={() => void acknowledgeAlert(alert.id)}
                       className="btn-secondary px-3 py-1 text-xs"
                     >
                       Acknowledge
