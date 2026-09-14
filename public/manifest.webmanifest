@@ -1,0 +1,25 @@
+{
+  "name": "Haryana Police OSINT Intelligence Platform",
+  "short_name": "HP OSINT",
+  "description": "AI-Based OSINT Intelligence Platform for Haryana Police",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#0d1e33",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

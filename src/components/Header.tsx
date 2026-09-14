@@ -33,7 +33,14 @@ export const Header = ({ user }: { user: any }) => {
             />
             <div>
               <p className="text-white font-medium">{user.name}</p>
-              <p className="text-police-400 text-sm">{user.rank} | {user.department}</p>
+              <p className="text-police-400 text-sm">
+                {user.rank} | {user.department}
+                {user.role && (
+                  <span className="ml-2 rounded bg-accent-cyan/10 px-2 py-0.5 text-xs font-medium capitalize text-accent-cyan">
+                    {user.role}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
           <button 

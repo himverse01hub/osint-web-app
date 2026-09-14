@@ -34,6 +34,27 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
   const relationshipOnly = tab === 'data' && searchParams.get('section') === 'relationships';
   const entityOnly = tab === 'data' && searchParams.get('section') === 'entities';
   const [notice, setNotice] = useState('');
+  const [pwForm, setPwForm] = useState({ next: '', confirm: '' });
+
+  const changeMyPassword = async () => {
+    if (!user?.id) return notify('You must be logged in to change your password.');
+    if (pwForm.next.length < 4) return notify('New password must be at least 4 characters.');
+    if (pwForm.next !== pwForm.confirm) return notify('New passwords do not match.');
+    try {
+      const response = await fetch(`/api/auth/users?id=${user.id}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwForm.next }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || 'Could not change password.');
+      setPwForm({ next: '', confirm: '' });
+      notify('Your password was changed. Other sessions were signed out.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not change password.');
+    }
+  };
   const [profile, setProfile] = useState({ name: saved.name || user?.name || '', email: saved.email || user?.email || '', department: saved.department || user?.department || '', rank: saved.rank || user?.rank || '', phone: saved.phone || user?.phone || '', badgeNumber: saved.badgeNumber || user?.badgeNumber || '' });
   const [preferences, setPreferences] = useState({ theme: saved.theme || 'dark', language: saved.language || 'en', emailAlerts: saved.emailAlerts ?? true, criticalAlerts: saved.criticalAlerts ?? true });
   const [users, setUsers] = useState<User[]>([]);
@@ -300,6 +321,13 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
             </div>
           </div>
 
+          {user?.role !== 'admin' ? (
+            <p className="rounded border border-police-700 bg-police-900/50 px-4 py-3 text-sm text-police-400">
+              User management is restricted to admins. You can still update your own profile and change your password below.
+            </p>
+          ) : (
+          <>
+
           <form
             className="grid grid-cols-1 gap-3 md:grid-cols-3"
             onSubmit={event => { event.preventDefault(); void saveUser(); }}
@@ -357,6 +385,17 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
               {!users.length && <p className="p-4 text-police-500">No users yet. Add the first investigator above.</p>}
             </div>
           )}
+          </>
+          )}
+        </section>
+        <section className="card p-6">
+          <h2 className="mb-2 text-lg font-semibold text-white">Change My Password</h2>
+          <p className="mb-4 text-sm text-police-400">Update the password for your own account ({user?.username || 'current user'}). Other devices are signed out automatically.</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <input className="input-field" type="password" autoComplete="new-password" placeholder="New password *" value={pwForm.next} onChange={event => setPwForm({ ...pwForm, next: event.target.value })} />
+            <input className="input-field" type="password" autoComplete="new-password" placeholder="Confirm new password *" value={pwForm.confirm} onChange={event => setPwForm({ ...pwForm, confirm: event.target.value })} />
+            <div><button type="button" className="btn-primary px-5 py-2" onClick={() => void changeMyPassword()}>Change password</button></div>
+          </div>
         </section>
         <section className="card p-6">
           <h2 className="mb-4 text-lg font-semibold text-white">Preferences</h2>

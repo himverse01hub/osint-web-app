@@ -252,6 +252,79 @@ async function searchNews(query: string): Promise<SearchEntity[]> {
   }));
 }
 
+const isIPv4 = (value: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(value.trim());
+const isHash = (value: string) => /^[a-fA-F0-9]{32}$/.test(value) || /^[a-fA-F0-9]{40}$/.test(value) || /^[a-fA-F0-9]{64}$/.test(value);
+const isDomainLike = (value: string) => /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/i.test(value.trim()) && !/\s/.test(value);
+
+async function searchThreatIntel(query: string): Promise<SearchEntity[]> {
+  const value = query.trim();
+  const out: SearchEntity[] = [];
+
+  if (isIPv4(value)) {
+    const data = await fetchJson(`https://ipwho.is/${encodeURIComponent(value)}`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'HaryanaPoliceOSINT/1.0 (haryana-police-osint web application)' },
+    }, { timeout: 4000, retries: 0 });
+    if (data?.success === false) throw new Error(data?.message || 'IP lookup failed');
+    out.push(emptyEntity({
+      id: `threat-ip-${value}`,
+      type: 'location',
+      value: `${data.ip ?? value} — ${data.city ?? ''} ${data.country ?? ''}`.trim(),
+      label: `${data.ip ?? value} (${data.country ?? 'unknown country'})`,
+      confidence: 62,
+      source: 'threat_intel',
+      sourceName: 'IPWho.is',
+      verified: false,
+      tags: ['threat_intel', 'ip_reputation'],
+      metadata: { ip: data.ip, asn: data.connection?.asn, org: data.connection?.org, isp: data.connection?.isp, city: data.city, country: data.country },
+    }));
+    return out;
+  }
+
+  if (isHash(value)) {
+    const response = await fetch('https://mb-api.abuse.ch/api/v1/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'HaryanaPoliceOSINT/1.0 (haryana-police-osint web application)' },
+      body: new URLSearchParams({ query: 'get_info', hash: value }).toString(),
+    });
+    if (!response.ok) throw new Error(`MalwareBazaar request failed: ${response.status}`);
+    const data = await response.json();
+    if (data?.query_status !== 'ok' || !data?.data?.length) return [];
+    return data.data.slice(0, 5).map((sample: any, index: number) => emptyEntity({
+      id: `threat-hash-${value}-${index}`,
+      type: 'document',
+      value: sample.sha256_hash || sample.sha1_hash || sample.md5_hash || value,
+      label: `${sample.file_name || 'malware sample'} (${sample.file_type || 'unknown type'})`,
+      confidence: 68,
+      source: 'threat_intel',
+      sourceName: 'MalwareBazaar',
+      verified: false,
+      tags: ['threat_intel', 'malware_hash'],
+      metadata: { signature: sample.signature, fileType: sample.file_type, firstSeen: sample.first_seen, tags: sample.tags },
+    }));
+  }
+
+  if (isDomainLike(value)) {
+    const data = await fetchJson(`https://urlscan.io/api/v1/search/?q=${encodeURIComponent(`domain:${value}`)}&size=5`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'HaryanaPoliceOSINT/1.0 (haryana-police-osint web application)' },
+    }, { timeout: 4000, retries: 0 });
+    return (data.results ?? []).map((scan: any, index: number) => emptyEntity({
+      id: `threat-urlscan-${index}-${scan._id ?? value}`,
+      type: 'document',
+      value: scan.page?.url || value,
+      label: scan.page?.url || value,
+      confidence: 60,
+      source: 'threat_intel',
+      sourceName: 'urlscan.io',
+      sourceUrl: scan.result || undefined,
+      verified: false,
+      tags: ['threat_intel', 'url_scan'],
+      metadata: { country: scan.page?.country, ip: scan.page?.ip, server: scan.page?.server },
+    }));
+  }
+
+  return [];
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'GET') {
     return response.status(405).json({ error: 'Method not allowed' });
@@ -268,6 +341,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const shouldSearchLocations = type === 'location' || type === 'all' || type === 'person' || type === 'organization';
   const shouldSearchNews = type !== 'crypto_wallet';
   const shouldSearchKnowledge = ['person', 'organization', 'username', 'all'].includes(type);
+  const threatIntelOn = String(request.query.threatIntel ?? 'on') !== 'off';
+  const shouldSearchThreatIntel = threatIntelOn && type !== 'crypto_wallet';
   const jobs: Promise<SearchEntity[]>[] = [];
 
   const sourceNames: string[] = [];
@@ -286,6 +361,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     addJob('Wikipedia', searchWikipedia(value, type));
   }
   if (shouldSearchNews) addJob('GDELT', searchNews(value));
+  if (shouldSearchThreatIntel) addJob('Threat intel', searchThreatIntel(value));
 
   const settled = await Promise.allSettled(jobs);
   const externalResults = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);

@@ -27,6 +27,30 @@ export const DashboardPage = () => {
   const [activeDrilldown, setActiveDrilldown] = useState<'cases' | 'alerts' | 'entities' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [widgets, setWidgets] = useState({ metrics: true, priority: true, casesBar: true });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('dashboard-widgets');
+      if (raw) {
+        const saved = JSON.parse(raw);
+        setWidgets(prev => ({
+          metrics: typeof saved.metrics === 'boolean' ? saved.metrics : prev.metrics,
+          priority: typeof saved.priority === 'boolean' ? saved.priority : prev.priority,
+          casesBar: typeof saved.casesBar === 'boolean' ? saved.casesBar : prev.casesBar,
+        }));
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('dashboard-widgets', JSON.stringify(widgets)); } catch { /* ignore */ }
+  }, [widgets]);
+
+  const toggleWidget = (key: 'metrics' | 'priority' | 'casesBar') => {
+    setWidgets(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -110,11 +134,31 @@ export const DashboardPage = () => {
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-2 text-xs text-police-500"><span className={`h-2 w-2 rounded-full ${refreshing ? 'animate-pulse bg-yellow-400' : 'bg-green-400'}`}></span>{refreshing ? 'Syncing' : lastSyncedAt ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString()}` : 'Connecting'}</span>
+          <button onClick={() => setShowCustomize(prev => !prev)} className="btn-secondary px-4 py-2" aria-expanded={showCustomize}>Customize</button>
           <button onClick={() => window.location.reload()} disabled={refreshing} className="btn-secondary px-4 py-2">{refreshing ? 'Refreshing...' : 'Refresh'}</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {showCustomize && (
+        <div className="card p-4">
+          <p className="text-sm font-medium text-white mb-2">Dashboard widgets</p>
+          <p className="text-xs text-police-500 mb-3">Show or hide sections. Your layout is saved in this browser.</p>
+          <div className="flex flex-wrap gap-4">
+            {([
+              { key: 'metrics' as const, label: 'Metric cards' },
+              { key: 'priority' as const, label: 'Priority overview' },
+              { key: 'casesBar' as const, label: 'Cases by priority bars' },
+            ]).map(item => (
+              <label key={item.key} className="flex items-center gap-2 text-sm text-police-300 cursor-pointer">
+                <input type="checkbox" checked={widgets[item.key]} onChange={() => toggleWidget(item.key)} className="h-4 w-4" />
+                {item.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${widgets.metrics ? '' : 'hidden'}`} aria-hidden={!widgets.metrics}>
         {[
           { key: 'cases' as const, label: 'Pending cases', value: stats.activeCases, detail: `${stats.totalCases} total investigations`, icon: 'folder', color: 'text-cyan-300' },
           { key: 'alerts' as const, label: 'Activity alerts', value: stats.totalAlerts, detail: `${stats.highPriorityAlerts} high priority`, icon: 'bell', color: 'text-amber-300' },
@@ -134,7 +178,7 @@ export const DashboardPage = () => {
       </div>
 
       {/* Priority-based cases overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 ${widgets.priority ? '' : 'hidden'}`} aria-hidden={!widgets.priority}>
         {(['critical', 'high', 'medium', 'low'] as const).map((priority) => {
           const priorityCases = casesByPriority[priority];
           if (!priorityCases || !priorityCases.length) return null;
@@ -229,7 +273,7 @@ export const DashboardPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className={`grid grid-cols-1 gap-6 ${widgets.casesBar ? '' : 'hidden'}`} aria-hidden={!widgets.casesBar}>
         <section className="card card-hover p-5">
           <div className="mb-5"><div><h2 className="text-lg font-semibold text-white">Cases by priority</h2><p className="text-sm text-police-500">Active and open investigations</p></div></div>
           <div className="space-y-4">{(['critical', 'high', 'medium', 'low'] as const).map((priority) => { const count = cases.filter((caseItem) => ['active', 'open'].includes(caseItem.status) && caseItem.priority === priority).length; const width = Math.min(100, count ? Math.max(12, (count / Math.max(stats.activeCases, 1)) * 100) : 0); return <div key={priority}><div className="mb-1 flex justify-between text-sm"><span className="capitalize text-police-300">{priority}</span><span className="font-semibold text-white">{count}</span></div><div className="h-2 rounded-full bg-police-800"><div className={`h-2 rounded-full ${priority === 'critical' ? 'bg-red-400' : priority === 'high' ? 'bg-orange-400' : priority === 'medium' ? 'bg-amber-300' : 'bg-emerald-400'}`} style={{ width: `${width}%` }}></div></div></div>; })}</div>

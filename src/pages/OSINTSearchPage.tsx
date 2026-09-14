@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pagination } from '../components/Pagination';
 
@@ -15,6 +15,57 @@ export const OSINTSearchPage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [recentSearches, setRecentSearches] = useState<Array<{query: string; type: string; timestamp: string; count: number}>>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [minConfidence, setMinConfidence] = useState(0);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'confidence' | 'recent'>('confidence');
+  const [savedSearches, setSavedSearches] = useState<Array<{name: string; type: string; value: string}>>([]);
+  const [saveName, setSaveName] = useState('');
+
+  useEffect(() => {
+    try {
+      const rawRecent = localStorage.getItem('recentSearches');
+      if (rawRecent) setRecentSearches(JSON.parse(rawRecent));
+      const rawSaved = localStorage.getItem('osint-saved-searches');
+      if (rawSaved) setSavedSearches(JSON.parse(rawSaved));
+      const rawAdv = localStorage.getItem('osint-advanced-filters');
+      if (rawAdv) {
+        const adv = JSON.parse(rawAdv);
+        if (typeof adv.minConfidence === 'number') setMinConfidence(Math.min(100, Math.max(0, adv.minConfidence)));
+        if (typeof adv.verifiedOnly === 'boolean') setVerifiedOnly(adv.verifiedOnly);
+        if (typeof adv.sourceFilter === 'string') setSourceFilter(adv.sourceFilter);
+        if (adv.sortBy === 'confidence' || adv.sortBy === 'recent') setSortBy(adv.sortBy);
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('osint-advanced-filters', JSON.stringify({ minConfidence, verifiedOnly, sourceFilter, sortBy }));
+    } catch { /* ignore storage errors */ }
+  }, [minConfidence, verifiedOnly, sourceFilter, sortBy]);
+
+  const saveCurrentSearch = () => {
+    const name = saveName.trim() || `${searchType}: ${searchValue.trim()}`;
+    if (!searchValue.trim()) return;
+    const entry = { name, type: searchType, value: searchValue.trim() };
+    const updated = [entry, ...savedSearches.filter(s => s.name !== entry.name)].slice(0, 20);
+    setSavedSearches(updated);
+    try { localStorage.setItem('osint-saved-searches', JSON.stringify(updated)); } catch { /* ignore */ }
+    setSaveName('');
+  };
+
+  const loadSavedSearch = (entry: {name: string; type: string; value: string}) => {
+    setSearchType(entry.type);
+    setSearchValue(entry.value);
+  };
+
+  const deleteSavedSearch = (name: string) => {
+    const updated = savedSearches.filter(s => s.name !== name);
+    setSavedSearches(updated);
+    try { localStorage.setItem('osint-saved-searches', JSON.stringify(updated)); } catch { /* ignore */ }
+  };
 
   const handleSearch = async (searchPage = 1, searchLimit = limit) => {
     if (!searchValue.trim()) return;
@@ -25,7 +76,7 @@ export const OSINTSearchPage = () => {
     try {
       const startedAt = performance.now();
       const response = await fetch(
-        `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}&page=${searchPage}&limit=${searchLimit}`
+        `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}&page=${searchPage}&limit=${searchLimit}&threatIntel=on`
       );
 
       if (!response.ok) {
@@ -95,16 +146,38 @@ export const OSINTSearchPage = () => {
     setActiveFilters(new Set());
   };
 
-  const filteredResults = useMemo(() => {
-    if (!results?.results || activeFilters.size === 0) return results?.results ?? {};
-    const filtered: Record<string, any[]> = {};
-    for (const [type, entities] of Object.entries(results.results)) {
-      if (activeFilters.has(type)) {
-        filtered[type] = entities as any[];
+  const uniqueSources = useMemo(() => {
+    if (!results?.results) return [];
+    const names = new Set<string>();
+    for (const entities of Object.values(results.results)) {
+      for (const e of (entities as any[])) {
+        if (e?.sourceName) names.add(String(e.sourceName));
       }
     }
+    return [...names].sort();
+  }, [results]);
+
+  const filteredResults = useMemo(() => {
+    if (!results?.results) return {};
+    const filtered: Record<string, any[]> = {};
+    for (const [type, entities] of Object.entries(results.results)) {
+      if (activeFilters.size > 0 && !activeFilters.has(type)) continue;
+      let list = (entities as any[]).filter((e: any) => {
+        if (typeof e?.confidence === 'number' && e.confidence < minConfidence) return false;
+        if (verifiedOnly && !e?.verified) return false;
+        if (sourceFilter !== 'all' && String(e?.sourceName) !== sourceFilter) return false;
+        return true;
+      });
+      list = [...list].sort((a: any, b: any) => {
+        if (sortBy === 'recent') {
+          return new Date(b?.discoveredAt ?? 0).getTime() - new Date(a?.discoveredAt ?? 0).getTime();
+        }
+        return (b?.confidence ?? 0) - (a?.confidence ?? 0);
+      });
+      if (list.length) filtered[type] = list;
+    }
     return filtered;
-  }, [results, activeFilters]);
+  }, [results, activeFilters, minConfidence, verifiedOnly, sourceFilter, sortBy]);
 
   const allFilteredEntities = useMemo(() => {
     return Object.values(filteredResults).flat();
@@ -122,16 +195,27 @@ export const OSINTSearchPage = () => {
       new Date(e.discoveredAt).toLocaleDateString(),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map((c: string) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
-    downloadFile(csv, 'search-results.csv', 'text/csv');
+    const slug = String(results?.query?.value ?? searchValue).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'search';
+    downloadFile(csv, `osint-${slug}-${Date.now()}.csv`, 'text/csv');
   };
 
   const exportJSON = () => {
     if (!allFilteredEntities.length) return;
-    const blob = new Blob([JSON.stringify(allFilteredEntities, null, 2)], { type: 'application/json' });
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      query: results?.query ?? { type: searchType, value: searchValue },
+      filters: { types: [...activeFilters], minConfidence, verifiedOnly, source: sourceFilter, sortBy },
+      sources: results?.sources ?? [],
+      sourceErrors: results?.sourceErrors ?? [],
+      count: allFilteredEntities.length,
+      results: allFilteredEntities,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'search-results.json';
+    const slug = String(results?.query?.value ?? searchValue).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'search';
+    a.download = `osint-${slug}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -161,11 +245,11 @@ export const OSINTSearchPage = () => {
             <p className="text-police-400">Search for persons, contacts, organizations, and digital footprints</p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="btn-secondary px-4 py-2">
+            <button onClick={() => setShowAdvanced(prev => !prev)} className="btn-secondary px-4 py-2" aria-expanded={showAdvanced}>
               <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M4 4v16h16"></path>
               </svg>
-              Advanced Search
+              {showAdvanced ? 'Hide Advanced' : 'Advanced Search'}
             </button>
           </div>
         </div>
@@ -216,6 +300,92 @@ export const OSINTSearchPage = () => {
               {loading ? 'Searching...' : 'Search Intelligence'}
             </button>
           </div>
+        </div>
+
+        {showAdvanced && (
+          <div className="card card-hover p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Advanced Filters</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="min-confidence" className="text-police-300 font-medium text-sm">Min confidence: {minConfidence}%</label>
+                <input
+                  id="min-confidence"
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={minConfidence}
+                  onChange={(e) => setMinConfidence(Number(e.target.value))}
+                  className="w-full mt-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="source-filter" className="text-police-300 font-medium text-sm">Source</label>
+                <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="w-full input-field mt-2">
+                  <option value="all">All sources</option>
+                  {uniqueSources.map(source => (
+                    <option key={source} value={source}>{source}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="sort-by" className="text-police-300 font-medium text-sm">Sort by</label>
+                <select id="sort-by" value={sortBy} onChange={(e) => setSortBy(e.target.value as 'confidence' | 'recent')} className="w-full input-field mt-2">
+                  <option value="confidence">Confidence (high first)</option>
+                  <option value="recent">Most recent first</option>
+                </select>
+              </div>
+              <div className="flex items-end gap-2 pb-1">
+                <input id="verified-only" type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="h-4 w-4" />
+                <label htmlFor="verified-only" className="text-police-300 font-medium text-sm">Verified only</label>
+              </div>
+            </div>
+            <p className="text-police-500 text-xs mt-3">Filters apply to results instantly and are included in CSV/JSON exports. Preferences are saved in this browser.</p>
+          </div>
+        )}
+
+        <div className="card card-hover p-6">
+          <h3 className="text-lg font-semibold text-white mb-3">Saved Searches</h3>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="Name this search (optional)"
+              className="input-field flex-1"
+            />
+            <button onClick={saveCurrentSearch} disabled={!searchValue.trim()} className="btn-secondary px-4 py-2 disabled:opacity-50">
+              Save Current
+            </button>
+          </div>
+          {savedSearches.length === 0 ? (
+            <p className="text-police-500 text-sm mt-3">No saved searches yet. Type a query above and click Save Current.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {savedSearches.map(entry => (
+                <div key={entry.name} className="flex items-center justify-between gap-2 bg-police-800/50 rounded-lg px-3 py-2">
+                  <button onClick={() => loadSavedSearch(entry)} className="text-left flex-1 min-w-0">
+                    <span className="block text-white text-sm font-medium truncate">{entry.name}</span>
+                    <span className="block text-police-500 text-xs truncate">{entry.type}: {entry.value}</span>
+                  </button>
+                  <button onClick={() => deleteSavedSearch(entry.name)} className="text-xs text-red-400 hover:text-red-300 shrink-0" aria-label={`Delete saved search ${entry.name}`}>
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {recentSearches.length > 0 && (
+            <div className="mt-4">
+              <p className="text-police-400 text-sm font-medium mb-2">Recent</p>
+              <div className="flex flex-wrap gap-2">
+                {recentSearches.slice(0, 8).map((s, i) => (
+                  <button key={`${s.query}-${s.type}-${i}`} onClick={() => { setSearchType(s.type); setSearchValue(s.query); }} className="px-3 py-1 rounded-full text-xs bg-police-800 text-police-300 hover:bg-police-700">
+                    {s.query} ({s.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search Tips */}
@@ -284,6 +454,41 @@ export const OSINTSearchPage = () => {
             Export JSON
           </button>
         </div>
+      </div>
+
+      {/* Advanced Filters (results view) */}
+      <div className="card p-4">
+        <button onClick={() => setShowAdvanced(prev => !prev)} className="text-sm font-medium text-accent-cyan" aria-expanded={showAdvanced}>
+          {showAdvanced ? 'Hide advanced filters ▾' : 'Show advanced filters ▸'}
+        </button>
+        {showAdvanced && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            <div>
+              <label htmlFor="min-confidence-results" className="text-police-300 font-medium text-xs">Min confidence: {minConfidence}%</label>
+              <input id="min-confidence-results" type="range" min={0} max={100} value={minConfidence} onChange={(e) => setMinConfidence(Number(e.target.value))} className="w-full mt-2" />
+            </div>
+            <div>
+              <label htmlFor="source-filter-results" className="text-police-300 font-medium text-xs">Source</label>
+              <select id="source-filter-results" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="w-full input-field mt-2">
+                <option value="all">All sources</option>
+                {uniqueSources.map(source => (
+                  <option key={source} value={source}>{source}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="sort-by-results" className="text-police-300 font-medium text-xs">Sort by</label>
+              <select id="sort-by-results" value={sortBy} onChange={(e) => setSortBy(e.target.value as 'confidence' | 'recent')} className="w-full input-field mt-2">
+                <option value="confidence">Confidence</option>
+                <option value="recent">Most recent</option>
+              </select>
+            </div>
+            <div className="flex items-end gap-2 pb-1">
+              <input id="verified-only-results" type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="h-4 w-4" />
+              <label htmlFor="verified-only-results" className="text-police-300 font-medium text-xs">Verified only</label>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filter Chips */}
