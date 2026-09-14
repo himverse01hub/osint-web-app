@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect } from 'react';
 import type { AuditLog } from '../types/osint';
 
@@ -12,7 +13,7 @@ export const AuditLogsPage = () => {
   const loadLogs = async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/audit-logs');
+        const response = await apiFetch('/api/audit-logs');
         if (!response.ok) throw new Error('Audit logs request failed');
         const data = await response.json();
         setLogs(data.logs ?? []);

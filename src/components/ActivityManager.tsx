@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useCallback } from 'react';
 
 interface AlertRow {
@@ -33,7 +34,7 @@ export const ActivityManager = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/alerts');
+      const response = await apiFetch('/api/alerts');
       if (!response.ok) throw new Error('Could not load alerts');
       const data = await response.json();
       setAlerts(data.alerts ?? []);
@@ -59,7 +60,7 @@ export const ActivityManager = ({ onClose }: { onClose: () => void }) => {
     setMessage('');
     setError('');
     try {
-      const response = await fetch('/api/alerts', {
+      const response = await apiFetch('/api/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -80,7 +81,7 @@ export const ActivityManager = ({ onClose }: { onClose: () => void }) => {
 
   const acknowledge = async (id: string) => {
     try {
-      const response = await fetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
+      const response = await apiFetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not acknowledge alert');
       setAlerts(prev => prev.map(a => a.id === id ? data.alert : a));
@@ -190,7 +191,7 @@ export const ActivityManager = ({ onClose }: { onClose: () => void }) => {
                   </div>
                   <p className="text-sm text-police-400">{alert.description}</p>
                   <p className="text-xs text-police-500 mt-1">
-                    {new Date(alert.createdAt).toLocaleString()} • {alert.type.replace('_', ' ')}
+                    {new Date(alert.createdAt).toLocaleString()} â€¢ {alert.type.replace('_', ' ')}
                   </p>
                 </div>
                 {alert.status !== 'acknowledged' && (

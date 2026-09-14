@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +27,7 @@ export const CaseDetailPage = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/cases?id=${encodeURIComponent(caseId)}`);
+      const response = await apiFetch(`/api/cases?id=${encodeURIComponent(caseId)}`);
       if (!response.ok) throw new Error('Case not found');
       const data = await response.json();
       const found: InvestigationCase = data.case;
@@ -63,7 +64,7 @@ export const CaseDetailPage = () => {
         address: form.address ?? '',
         anyId: form.anyId ?? '',
       };
-      const response = await fetch(`/api/cases?id=${encodeURIComponent(caseId)}`, {
+      const response = await apiFetch(`/api/cases?id=${encodeURIComponent(caseId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -104,7 +105,7 @@ export const CaseDetailPage = () => {
         reader.readAsDataURL(selected);
       });
 
-      const response = await fetch(`/api/cases?upload=1&id=${encodeURIComponent(caseId)}`, {
+      const response = await apiFetch(`/api/cases?upload=1&id=${encodeURIComponent(caseId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +136,7 @@ export const CaseDetailPage = () => {
 
   const openFile = async (file: CaseFile) => {
     try {
-      const response = await fetch(`/api/cases?file=1&fileId=${encodeURIComponent(file.id)}`);
+      const response = await apiFetch(`/api/cases?file=1&fileId=${encodeURIComponent(file.id)}`);
       if (!response.ok) throw new Error('Could not fetch file');
       const data = await response.json();
       const blob = base64ToBlob(data.file.data, data.file.mimeType);
@@ -156,7 +157,7 @@ export const CaseDetailPage = () => {
     if (!caseId) return;
     if (!window.confirm(`Delete "${file.fileName}" from this case?`)) return;
     try {
-      const response = await fetch(`/api/cases?file=1&id=${encodeURIComponent(caseId)}&fileId=${encodeURIComponent(file.id)}`, {
+      const response = await apiFetch(`/api/cases?file=1&id=${encodeURIComponent(caseId)}&fileId=${encodeURIComponent(file.id)}`, {
         method: 'DELETE',
       });
       if (response.status !== 204 && !response.ok) throw new Error('Could not delete file');
@@ -191,7 +192,7 @@ export const CaseDetailPage = () => {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <button onClick={() => navigate('/cases')} className="text-sm text-police-400 hover:text-police-200 mb-1">
-            ← Back to Investigations
+            â† Back to Investigations
           </button>
           <h1 className="text-2xl font-bold text-gradient">
             Case #{caseItem.caseNumber}
@@ -314,7 +315,7 @@ export const CaseDetailPage = () => {
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium text-white">{file.fileName}</p>
                   <p className="text-xs text-police-500">
-                    {(file.sizeBytes / 1024).toFixed(1)} KB • {new Date(file.createdAt).toLocaleString()}
+                    {(file.sizeBytes / 1024).toFixed(1)} KB â€¢ {new Date(file.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <button

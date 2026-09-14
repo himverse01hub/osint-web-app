@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pagination } from '../components/Pagination';
@@ -75,7 +76,7 @@ export const OSINTSearchPage = () => {
     setSearchError('');
     try {
       const startedAt = performance.now();
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/search?type=${encodeURIComponent(searchType)}&value=${encodeURIComponent(searchValue.trim())}&page=${searchPage}&limit=${searchLimit}&threatIntel=on`
       );
 
@@ -380,7 +381,7 @@ export const OSINTSearchPage = () => {
               <div className="flex flex-wrap gap-2">
                 {recentSearches.slice(0, 8).map((s, i) => (
                   <button key={`${s.query}-${s.type}-${i}`} title={`Searched: ${new Date(s.timestamp).toLocaleString()}`} onClick={() => { setSearchType(s.type); setSearchValue(s.query); }} className="px-3 py-1 rounded-full text-xs bg-police-800 text-police-300 hover:bg-police-700">
-                    {s.query} ({s.count}) • {new Date(s.timestamp).toLocaleString()}
+                    {s.query} ({s.count}) â€¢ {new Date(s.timestamp).toLocaleString()}
                   </button>
                 ))}
               </div>
@@ -393,22 +394,22 @@ export const OSINTSearchPage = () => {
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Search Tips</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• Use exact phone numbers for best results</li>
-              <li>• Email searches check breaches and social media</li>
-              <li>• Username searches across social platforms</li>
-              <li>• Organization searches include registration data</li>
-              <li>• Crypto wallet searches blockchain explorers</li>
+              <li>â€¢ Use exact phone numbers for best results</li>
+              <li>â€¢ Email searches check breaches and social media</li>
+              <li>â€¢ Username searches across social platforms</li>
+              <li>â€¢ Organization searches include registration data</li>
+              <li>â€¢ Crypto wallet searches blockchain explorers</li>
             </ul>
           </div>
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Data Sources</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• Social Media Platforms</li>
-              <li>• Public Records & Databases</li>
-              <li>• News & Publications</li>
-              <li>• Dark Web Mentions (Lawful Recording)</li>
-              <li>• Financial & Blockchain Data</li>
-              <li>• Corporate Registries</li>
+              <li>â€¢ Social Media Platforms</li>
+              <li>â€¢ Public Records & Databases</li>
+              <li>â€¢ News & Publications</li>
+              <li>â€¢ Dark Web Mentions (Lawful Recording)</li>
+              <li>â€¢ Financial & Blockchain Data</li>
+              <li>â€¢ Corporate Registries</li>
             </ul>
           </div>
         </div>
@@ -459,7 +460,7 @@ export const OSINTSearchPage = () => {
       {/* Advanced Filters (results view) */}
       <div className="card p-4">
         <button onClick={() => setShowAdvanced(prev => !prev)} className="text-sm font-medium text-accent-cyan" aria-expanded={showAdvanced}>
-          {showAdvanced ? 'Hide advanced filters ▾' : 'Show advanced filters ▸'}
+          {showAdvanced ? 'Hide advanced filters â–¾' : 'Show advanced filters â–¸'}
         </button>
         {showAdvanced && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
@@ -578,7 +579,7 @@ export const OSINTSearchPage = () => {
                         </div>
                       </div>
                       <p className="text-police-400 text-sm">
-                          Source: {entity.sourceName} •
+                          Source: {entity.sourceName} â€¢
                           <span title={new Date(entity.discoveredAt).toISOString()}>{new Date(entity.discoveredAt).toLocaleString()}</span>
                       </p>
                       {entity.type === 'person' && (
@@ -613,7 +614,7 @@ export const OSINTSearchPage = () => {
                             <span className="font-medium">{entity.balance?.split(' ')[0] || '0'}</span>
                           </div>
                           <p className="text-police-500 text-xs">
-                            {entity.transactions} transactions • 
+                            {entity.transactions} transactions â€¢ 
                             {entity.exchanges?.length > 0 ? entity.exchanges.join(', ') : 'Multiple exchanges'}
                           </p>
                         </div>

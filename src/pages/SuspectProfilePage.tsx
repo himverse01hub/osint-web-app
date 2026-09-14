@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -18,7 +19,7 @@ export const SuspectProfilePage = () => {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/entities?id=${encodeURIComponent(entityId)}`);
+        const response = await apiFetch(`/api/entities?id=${encodeURIComponent(entityId)}`);
         if (!response.ok) throw new Error('Entity profile request failed');
         const data = await response.json();
         setEntity(data.entity);
@@ -82,7 +83,7 @@ export const SuspectProfilePage = () => {
             {getEntityTypeLabel(entity.type)} Profile
           </h1>
           <p className="text-police-400">
-            Entity ID: {entity.id} • {entity.confidence}% Confidence • Source: {entity.sourceName}
+            Entity ID: {entity.id} â€¢ {entity.confidence}% Confidence â€¢ Source: {entity.sourceName}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -567,7 +568,7 @@ const ActivityTab = ({ entity, relationships }: { entity: any; relationships: an
                 <div className="flex-1">
                   <h4 className="font-medium text-white">{rel.description}</h4>
                   <p className="text-police-400 text-sm">
-                    Strength: {rel.strength}% • Confidence: {rel.confidence}% • {new Date(rel.discoveredAt).toLocaleString()}
+                    Strength: {rel.strength}% â€¢ Confidence: {rel.confidence}% â€¢ {new Date(rel.discoveredAt).toLocaleString()}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomBytes } from 'node:crypto';
 import { requireDatabase } from './_lib/db.js';
+import { rateLimit } from './_lib/rate-limit.js';
 import {
   DEFAULT_PROFILE,
   activeUser,
@@ -218,6 +219,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     async function login() {
       if (!username || !password) return response.status(400).json({ error: 'Username and password are required' });
+      // Brute-force brake: 10 attempts/min per username, 30/min per source IP.
+      const ip = String(request.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown';
+      const userGate = rateLimit(`login:user:${username.toLowerCase()}`, { limit: 10, windowMs: 60_000 });
+      const ipGate = rateLimit(`login:ip:${ip}`, { limit: 30, windowMs: 60_000 });
+      if (!userGate.allowed || !ipGate.allowed) {
+        const retryAfterSec = Math.max(userGate.retryAfterSec, ipGate.retryAfterSec);
+        response.setHeader('Retry-After', String(retryAfterSec));
+        return response.status(429).json({ error: 'Too many login attempts. Please try again shortly.' });
+      }
       const setup = await hasCredentials(database);
       if (!setup) return response.status(200).json({ user: defaultUser(), needsSetup: true });
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,6 +10,19 @@ export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('expired') === '1') {
+      setNotice('Your session has expired. Please sign in again.');
+      try {
+        sessionStorage.removeItem('hp_session_expired');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +109,11 @@ export const LoginPage = () => {
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+          {notice && (
+            <div className="bg-amber-900/40 border border-amber-700 text-amber-300 px-4 py-3 rounded-lg">
+              {notice}
+            </div>
+          )}
           {error && (
             <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg">
               {error}

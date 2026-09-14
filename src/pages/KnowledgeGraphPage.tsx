@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -238,7 +239,7 @@ export const KnowledgeGraphPage = () => {
         return;
       }
       try {
-        const response = await fetch('/api/entities');
+        const response = await apiFetch('/api/entities');
         if (!response.ok) throw new Error('Knowledge graph request failed');
         const graphData = await response.json();
         const allEntities = graphData.entities ?? [];
@@ -613,7 +614,7 @@ export const KnowledgeGraphPage = () => {
           <span className="text-sm text-police-500">Zoom: {(transform.k * 100).toFixed(0)}%</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={handleZoomOut} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Zoom out manually">− Zoom Out</button>
+          <button type="button" onClick={handleZoomOut} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Zoom out manually">âˆ’ Zoom Out</button>
           <input
             type="range"
             min={0.1}
@@ -771,7 +772,7 @@ export const KnowledgeGraphPage = () => {
                           fontFamily="Inter, system-ui, sans-serif"
                           fontWeight="500"
                         >
-                          {node.label.length > 20 ? node.label.slice(0, 18) + '…' : node.label}
+                          {node.label.length > 20 ? node.label.slice(0, 18) + 'â€¦' : node.label}
                         </text>
                       )}
                     </g>
@@ -869,7 +870,7 @@ export const KnowledgeGraphPage = () => {
                     <h3 className="text-lg font-semibold text-white">{selectedNode.label}</h3>
                     <p className="text-xs capitalize text-police-400">
                       {String(selectedNode.type).replace('_', ' ')}
-                      {selectedNode.verified ? ' • Verified' : ''}
+                      {selectedNode.verified ? ' â€¢ Verified' : ''}
                     </p>
                   </div>
                 </div>
@@ -879,7 +880,7 @@ export const KnowledgeGraphPage = () => {
                   className="text-police-400 hover:text-white text-xl leading-none px-2"
                   aria-label="Close node details"
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
 
@@ -894,11 +895,11 @@ export const KnowledgeGraphPage = () => {
                 </div>
                 <div className="rounded-lg bg-police-800/50 p-3">
                   <p className="text-xs text-police-400">Confidence</p>
-                  <p className="mt-1 font-medium text-white">{selectedNode.confidence != null ? `${selectedNode.confidence}%` : '—'}</p>
+                  <p className="mt-1 font-medium text-white">{selectedNode.confidence != null ? `${selectedNode.confidence}%` : 'â€”'}</p>
                 </div>
                 <div className="rounded-lg bg-police-800/50 p-3">
                   <p className="text-xs text-police-400">Source</p>
-                  <p className="mt-1 font-medium text-white">{selectedNode.sourceName || selectedNode.source || '—'}</p>
+                  <p className="mt-1 font-medium text-white">{selectedNode.sourceName || selectedNode.source || 'â€”'}</p>
                 </div>
                 {selectedNode.discoveredAt && (
                   <div className="col-span-2 rounded-lg bg-police-800/50 p-3">

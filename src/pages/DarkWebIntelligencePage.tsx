@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { DarkWebMention } from '../types/osint';
@@ -44,7 +45,7 @@ export const DarkWebIntelligencePage = () => {
       if (filterSeverity !== 'all') params.set('severity', filterSeverity);
       if (filterStatus !== 'all') params.set('status', filterStatus);
       
-      const response = await fetch(`/api/dark-web?${params.toString()}`);
+      const response = await apiFetch(`/api/dark-web?${params.toString()}`);
       if (!response.ok) throw new Error('Dark web intelligence request failed');
       const data = await response.json();
       setMentions(data.mentions ?? []);
@@ -85,7 +86,7 @@ export const DarkWebIntelligencePage = () => {
         datePosted: form.datePosted || undefined,
         sourceUrl: form.sourceUrl || undefined,
       };
-      const response = await fetch('/api/dark-web', {
+      const response = await apiFetch('/api/dark-web', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -104,7 +105,7 @@ export const DarkWebIntelligencePage = () => {
 
   const updateMention = async (id: string, patch: Record<string, unknown>) => {
     try {
-      const response = await fetch(`/api/dark-web?id=${encodeURIComponent(id)}`, {
+      const response = await apiFetch(`/api/dark-web?id=${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -290,7 +291,7 @@ export const DarkWebIntelligencePage = () => {
                   <div>
                     <h4 className="font-medium text-white">{mention.listingTitle}</h4>
                     <p className="text-police-400 text-sm">
-                      Marketplace: {mention.marketPlace} •
+                      Marketplace: {mention.marketPlace} â€¢
                       {mention.datePosted ? new Date(mention.datePosted).toLocaleString() : 'Date not available'}
                     </p>
                   </div>

@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
@@ -22,13 +23,13 @@ export const IntelligenceReportPage = () => {
   useEffect(() => {
     const loadCases = async () => {
       try {
-        const response = await fetch('/api/cases');
+        const response = await apiFetch('/api/cases');
         if (!response.ok) throw new Error('Cases request failed');
 
         const [data, entityResponse, relationshipResponse] = await Promise.all([
           response.json(),
-          fetch('/api/entities'),
-          fetch('/api/relationships'),
+          apiFetch('/api/entities'),
+          apiFetch('/api/relationships'),
         ]);
         if (!entityResponse.ok || !relationshipResponse.ok) throw new Error('Report inventory request failed');
         const [entityData, relationshipData] = await Promise.all([entityResponse.json(), relationshipResponse.json()]);
@@ -73,7 +74,7 @@ export const IntelligenceReportPage = () => {
       type: 'entities',
       title: entity.label || entity.value,
       caseNumber: '-',
-      detail: `${entity.type.replace(/_/g, ' ')} • ${entity.sourceName || 'Unknown source'}`,
+      detail: `${entity.type.replace(/_/g, ' ')} â€¢ ${entity.sourceName || 'Unknown source'}`,
       status: 'pending',
       rawStatus: 'pending',
       priority: '-',
@@ -83,7 +84,7 @@ export const IntelligenceReportPage = () => {
     ...relationships.map((relationship: any) => ({
       id: relationship.id,
       type: 'relationships',
-      title: `${relationship.sourceLabel || relationship.sourceId} → ${relationship.targetLabel || relationship.targetId}`,
+      title: `${relationship.sourceLabel || relationship.sourceId} â†’ ${relationship.targetLabel || relationship.targetId}`,
       caseNumber: '-',
       detail: relationship.type.replace(/_/g, ' '),
       status: 'pending',
@@ -238,8 +239,8 @@ export const IntelligenceReportPage = () => {
       if (!caseObj) throw new Error('Case not found');
 
       const [caseResponse, graphResponse] = await Promise.all([
-        fetch(`/api/cases?id=${encodeURIComponent(caseObj.id)}`),
-        fetch('/api/entities'),
+        apiFetch(`/api/cases?id=${encodeURIComponent(caseObj.id)}`),
+        apiFetch('/api/entities'),
       ]);
       if (!caseResponse.ok || !graphResponse.ok) throw new Error('Database request failed');
 
@@ -429,7 +430,7 @@ export const IntelligenceReportPage = () => {
               <option value="">Choose a case</option>
               {cases.map((caseItem: any) => (
                 <option key={caseItem.id} value={caseItem.id}>
-                  {caseItem.caseNumber} — {caseItem.title}
+                  {caseItem.caseNumber} â€” {caseItem.title}
                 </option>
               ))}
             </select>

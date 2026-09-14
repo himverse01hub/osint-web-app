@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -61,10 +62,10 @@ export const DashboardPage = () => {
 
       try {
         const [statsResponse, casesResponse, entitiesResponse, alertsResponse] = await Promise.all([
-          fetch('/api/dashboard'),
-          fetch('/api/cases'),
-          fetch('/api/entities'),
-          fetch('/api/alerts?limit=10'),
+          apiFetch('/api/dashboard'),
+          apiFetch('/api/cases'),
+          apiFetch('/api/entities'),
+          apiFetch('/api/alerts?limit=10'),
         ]);
 
         if (!statsResponse.ok || !casesResponse.ok || !entitiesResponse.ok || !alertsResponse.ok) {
@@ -260,9 +261,9 @@ export const DashboardPage = () => {
                 </div>
               ) : drilldownRows.length ? drilldownRows.slice(0, 10).map((row: any) => (
                 <div key={row.id} className="rounded-lg border border-police-800 bg-police-950/40 p-3">
-                  {activeDrilldown === 'cases' && <><p className="font-medium text-white">{row.caseNumber} · {row.title}</p><p className="text-sm capitalize text-police-400">{row.status} · {row.priority} priority</p>{row.updatedAt && <p className="text-xs text-police-500">Updated: {new Date(row.updatedAt).toLocaleString()}</p>}</>}
-                  {activeDrilldown === 'alerts' && <><p className="font-medium text-white">{row.title}</p><p className="text-sm text-police-400">{row.description || 'No description'} · {row.severity} severity</p>{row.createdAt && <p className="text-xs text-police-500">Created: {new Date(row.createdAt).toLocaleString()}</p>}</>}
-                  {activeDrilldown === 'entities' && <><p className="font-medium text-white">{row.label || row.value}</p><p className="text-sm capitalize text-police-400">{row.type?.replace('_', ' ')} · {row.value}</p>{row.discoveredAt && <p className="text-xs text-police-500">Added: {new Date(row.discoveredAt).toLocaleString()}</p>}</>}
+                  {activeDrilldown === 'cases' && <><p className="font-medium text-white">{row.caseNumber} Â· {row.title}</p><p className="text-sm capitalize text-police-400">{row.status} Â· {row.priority} priority</p>{row.updatedAt && <p className="text-xs text-police-500">Updated: {new Date(row.updatedAt).toLocaleString()}</p>}</>}
+                  {activeDrilldown === 'alerts' && <><p className="font-medium text-white">{row.title}</p><p className="text-sm text-police-400">{row.description || 'No description'} Â· {row.severity} severity</p>{row.createdAt && <p className="text-xs text-police-500">Created: {new Date(row.createdAt).toLocaleString()}</p>}</>}
+                  {activeDrilldown === 'entities' && <><p className="font-medium text-white">{row.label || row.value}</p><p className="text-sm capitalize text-police-400">{row.type?.replace('_', ' ')} Â· {row.value}</p>{row.discoveredAt && <p className="text-xs text-police-500">Added: {new Date(row.discoveredAt).toLocaleString()}</p>}</>}
                 </div>
               )) : <p className="py-8 text-center text-police-500">No related data available yet.</p>}
             </div>

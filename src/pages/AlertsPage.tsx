@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from '../types/osint';
 import { Pagination } from '../components/Pagination';
@@ -26,7 +27,7 @@ export const AlertsPage = () => {
       if (acknowledgedFilter === 'acknowledged') params.set('acknowledged', 'true');
       if (acknowledgedFilter === 'unacknowledged') params.set('acknowledged', 'false');
 
-      const response = await fetch(`/api/alerts?${params.toString()}`);
+      const response = await apiFetch(`/api/alerts?${params.toString()}`);
       if (!response.ok) throw new Error('Alerts request failed');
       const data = await response.json();
       setAlerts(data.alerts ?? []);
@@ -49,7 +50,7 @@ export const AlertsPage = () => {
 
   const acknowledgeAlert = async (id: string) => {
     try {
-      const response = await fetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
+      const response = await apiFetch(`/api/alerts?id=${encodeURIComponent(id)}`, { method: 'PATCH' });
       if (response.ok) void loadAlerts();
     } catch (error) {
       console.error('Error acknowledging alert:', error);

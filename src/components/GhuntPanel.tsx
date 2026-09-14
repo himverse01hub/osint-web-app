@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState } from 'react';
 
 interface GhuntResult {
@@ -22,7 +23,7 @@ export const GhuntPanel = () => {
     setError('');
     setResult(null);
     try {
-      const response = await fetch('/api/osint', {
+      const response = await apiFetch('/api/osint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool: 'ghunt', action, query: query.trim() }),

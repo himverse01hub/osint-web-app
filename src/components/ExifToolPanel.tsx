@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState } from 'react';
 
 export const ExifToolPanel = () => {
@@ -53,7 +54,7 @@ export const ExifToolPanel = () => {
     setError('');
     setResult(null);
       try {
-      const response = await fetch('/api/osint', {
+      const response = await apiFetch('/api/osint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool: 'exiftool', action, imageData }),

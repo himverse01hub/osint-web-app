@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { AIChatInterface } from '../components/AIChatInterface';
@@ -26,7 +27,7 @@ export const AIAssistantPage = () => {
   const handleContextChange = async (entity: any) => {
     if (entity?.id && !entity?.label) {
       try {
-        const response = await fetch(`/api/entities?id=${encodeURIComponent(entity.id)}`);
+        const response = await apiFetch(`/api/entities?id=${encodeURIComponent(entity.id)}`);
         if (response.ok) {
           const data = await response.json();
           setContextEntity(data.entity);
@@ -99,7 +100,7 @@ export const AIAssistantPage = () => {
             onClick={() => setContextEntity(null)}
             className="text-sm text-police-400 hover:text-police-300"
           >
-            ×
+            Ã—
           </button>
         </div>
       )}
@@ -120,28 +121,28 @@ export const AIAssistantPage = () => {
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Person Investigations</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• "Find all phone numbers associated with this person"</li>
-              <li>• "Show me this suspect's social media profiles"</li>
-              <li>• "What organizations is this person connected to?"</li>
-              <li>• "Show cryptocurrency wallet activity"</li>
+              <li>â€¢ "Find all phone numbers associated with this person"</li>
+              <li>â€¢ "Show me this suspect's social media profiles"</li>
+              <li>â€¢ "What organizations is this person connected to?"</li>
+              <li>â€¢ "Show cryptocurrency wallet activity"</li>
             </ul>
           </div>
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Network Analysis</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• "Show connections between these two entities"</li>
-              <li>• "Map the relationship network for this organization"</li>
-              <li>• "Find common contacts between these entities"</li>
-              <li>• "What is the strength of this relationship?"</li>
+              <li>â€¢ "Show connections between these two entities"</li>
+              <li>â€¢ "Map the relationship network for this organization"</li>
+              <li>â€¢ "Find common contacts between these entities"</li>
+              <li>â€¢ "What is the strength of this relationship?"</li>
             </ul>
           </div>
           <div className="card card-hover p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Financial Intelligence</h3>
             <ul className="space-y-2 text-police-400 text-sm">
-              <li>• "Show all cryptocurrency wallets linked to this person"</li>
-              <li>• "Find recent transactions in this wallet"</li>
-              <li>• "Are there any fiat-to-crypto conversions?"</li>
-              <li>• "Show exchange usage patterns"</li>
+              <li>â€¢ "Show all cryptocurrency wallets linked to this person"</li>
+              <li>â€¢ "Find recent transactions in this wallet"</li>
+              <li>â€¢ "Are there any fiat-to-crypto conversions?"</li>
+              <li>â€¢ "Show exchange usage patterns"</li>
             </ul>
           </div>
         </div>

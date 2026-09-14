@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect, useCallback } from 'react';
 import { EntityType } from '../types/osint';
 import { Pagination } from './Pagination';
@@ -68,7 +69,7 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/entities?page=${loadPage}&limit=${loadLimit}`);
+      const response = await apiFetch(`/api/entities?page=${loadPage}&limit=${loadLimit}`);
       if (!response.ok) throw new Error('Could not load entities');
       const data = await response.json();
       setEntities((data.entities ?? []).filter((entity: EntityRow) => entity.sourceName === 'Investigator entry'));
@@ -128,7 +129,7 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
     setMessage('');
     setError('');
     try {
-      const response = await fetch(editingId ? `/api/entities?id=${encodeURIComponent(editingId)}` : '/api/entities', {
+      const response = await apiFetch(editingId ? `/api/entities?id=${encodeURIComponent(editingId)}` : '/api/entities', {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +154,7 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
   const deleteEntity = async (id: string) => {
     if (!window.confirm('Delete this entity from the database?')) return;
     try {
-      const response = await fetch(`/api/entities?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/entities?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (response.status !== 204 && !response.ok) throw new Error('Could not delete entity');
       setMessage('Entity deleted.');
       setTimeout(() => setMessage(''), 4000);
@@ -220,7 +221,7 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
               </label>
               <label className="text-sm text-police-300">Label (display name)
                 <input className="input-field mt-1 w-full" value={form.label}
-                  onChange={event => setForm({ ...form, label: event.target.value })} placeholder="Optional — defaults to value" />
+                  onChange={event => setForm({ ...form, label: event.target.value })} placeholder="Optional â€” defaults to value" />
               </label>
               <label className="text-sm text-police-300">Source
                 <select
@@ -304,10 +305,10 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-medium text-white">{entity.label || entity.value}</p>
                   <p className="truncate text-xs text-police-500">
-                    {entity.value} • {entity.source.replace('_', ' ')} • {entity.confidence}% • {entity.verified ? 'Verified' : 'Unverified'}
+                    {entity.value} â€¢ {entity.source.replace('_', ' ')} â€¢ {entity.confidence}% â€¢ {entity.verified ? 'Verified' : 'Unverified'}
                   </p>
                   <p className="truncate text-xs text-police-600" title={entity.discoveredAt ? new Date(entity.discoveredAt).toISOString() : undefined}>
-                    Added: {entity.discoveredAt ? new Date(entity.discoveredAt).toLocaleString() : '—'}
+                    Added: {entity.discoveredAt ? new Date(entity.discoveredAt).toLocaleString() : 'â€”'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

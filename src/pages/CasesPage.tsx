@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { InvestigationCase } from '../types/osint';
@@ -55,7 +56,7 @@ export const CasesPage = () => {
       params.set('limit', String(loadLimit));
       if (selectedPriority) params.set('priority', selectedPriority);
       
-      const response = await fetch(`/api/cases?${params.toString()}`);
+      const response = await apiFetch(`/api/cases?${params.toString()}`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Could not load cases');
       setCases(data.cases ?? []);
@@ -103,7 +104,7 @@ export const CasesPage = () => {
     setError('');
     setNotice('');
     try {
-      const response = await fetch(editingCase ? `/api/cases?id=${encodeURIComponent(editingCase.id)}` : '/api/cases', {
+      const response = await apiFetch(editingCase ? `/api/cases?id=${encodeURIComponent(editingCase.id)}` : '/api/cases', {
         method: editingCase ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -125,7 +126,7 @@ export const CasesPage = () => {
     setError('');
     setNotice('');
     try {
-      const response = await fetch(`/api/cases?id=${encodeURIComponent(caseItem.id)}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/cases?id=${encodeURIComponent(caseItem.id)}`, { method: 'DELETE' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Could not remove case');
       setCases(current => current.filter(item => item.id !== caseItem.id));

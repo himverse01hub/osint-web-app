@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useState, useEffect } from 'react';
 
 interface AIChatInterfaceProps {
@@ -45,7 +46,7 @@ export const AIChatInterface = ({
     setLoading(true);
 
     try {
-      const response = await fetch('/api/assistant', {
+      const response = await apiFetch('/api/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

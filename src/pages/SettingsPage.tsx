@@ -1,3 +1,4 @@
+﻿import { apiFetch } from '../lib/api';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -41,7 +42,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
     if (pwForm.next.length < 4) return notify('New password must be at least 4 characters.');
     if (pwForm.next !== pwForm.confirm) return notify('New passwords do not match.');
     try {
-      const response = await fetch(`/api/auth/users?id=${user.id}`, {
+      const response = await apiFetch(`/api/auth/users?id=${user.id}`, {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -82,9 +83,9 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
     setLoading(true);
     try {
       const [entityResponse, caseResponse, relationshipResponse] = await Promise.all([
-        fetch('/api/entities'),
-        fetch('/api/cases'),
-        fetch('/api/relationships'),
+        apiFetch('/api/entities'),
+        apiFetch('/api/cases'),
+        apiFetch('/api/relationships'),
       ]);
       if (!entityResponse.ok || !caseResponse.ok || !relationshipResponse.ok) {
         throw new Error('Database unavailable. Set DATABASE_URL and run db/schema.sql + db/migrations/001_real_time_data.sql.');
@@ -108,7 +109,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
   const loadUsers = async () => {
     setUsersLoading(true);
     try {
-      const response = await fetch('/api/auth/users', { credentials: 'same-origin' });
+      const response = await apiFetch('/api/auth/users', { credentials: 'same-origin' });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(json.error || 'Could not load users.');
       setUsers(json.users ?? []);
@@ -122,7 +123,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
 
   const saveProfile = async () => {
     try {
-      const response = await fetch('/api/auth/profile', {
+      const response = await apiFetch('/api/auth/profile', {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -161,7 +162,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
       phone: userForm.phone.trim(),
     };
     try {
-      const response = await fetch(isEdit ? `/api/auth/users?id=${userForm.id}` : '/api/auth/users', {
+      const response = await apiFetch(isEdit ? `/api/auth/users?id=${userForm.id}` : '/api/auth/users', {
         method: isEdit ? 'PATCH' : 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +183,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
     if (id === user?.id) return notify('You cannot delete your own profile.');
     if (!window.confirm('Delete this investigator profile permanently? They will be removed as a login user.')) return;
     try {
-      const response = await fetch(`/api/auth/users?id=${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      const response = await apiFetch(`/api/auth/users?id=${id}`, { method: 'DELETE', credentials: 'same-origin' });
       if (response.status === 204) {
         notify('Investigator profile deleted.');
       } else {
@@ -198,7 +199,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
   const saveEntity = async (event: FormEvent) => {
     event.preventDefault();
     const payload = { ...entity, label: entity.label || entity.value, tags: entity.tags.split(',').map(tag => tag.trim()).filter(Boolean) };
-    const response = await fetch(editingEntity ? `/api/entities?id=${editingEntity}` : '/api/entities', {
+    const response = await apiFetch(editingEntity ? `/api/entities?id=${editingEntity}` : '/api/entities', {
       method: editingEntity ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -213,7 +214,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
 
   const deleteEntity = async (id: string) => {
     if (!window.confirm('Delete this entity from the database?')) return;
-    const response = await fetch(`/api/entities?id=${id}`, { method: 'DELETE' });
+    const response = await apiFetch(`/api/entities?id=${id}`, { method: 'DELETE' });
     if (!response.ok) return notify('Could not delete entity.');
     notify('Entity deleted.');
     void loadData();
@@ -228,7 +229,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
     };
     const currentCaseId = editingCase;
     try {
-      const response = await fetch(currentCaseId ? `/api/cases?id=${currentCaseId}` : '/api/cases', {
+      const response = await apiFetch(currentCaseId ? `/api/cases?id=${currentCaseId}` : '/api/cases', {
         method: currentCaseId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -253,7 +254,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
   const saveRelationship = async (event: FormEvent) => {
     event.preventDefault();
     if (!relationship.sourceId || !relationship.targetId) return notify('Select both entities for the relationship.');
-    const response = await fetch('/api/relationships', {
+    const response = await apiFetch('/api/relationships', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(relationship),
@@ -267,7 +268,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
 
   const deleteRelationship = async (id: string) => {
     if (!window.confirm('Delete this relationship from the database?')) return;
-    const response = await fetch(`/api/relationships?id=${id}`, { method: 'DELETE' });
+    const response = await apiFetch(`/api/relationships?id=${id}`, { method: 'DELETE' });
     if (response.status !== 204 && !response.ok) return notify('Could not delete relationship.');
     notify('Relationship deleted.');
     void loadData();
@@ -278,7 +279,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
       <option key={row.id} value={row.id}>{row.label || row.value} ({row.type.replace('_', ' ')})</option>
     ))
   ) : (
-    <option value="" disabled>No entities yet — add one above</option>
+    <option value="" disabled>No entities yet â€” add one above</option>
   );
 
   return <div className="space-y-6">
@@ -287,7 +288,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
         {relationshipOnly || entityOnly ? (
           <div className="flex items-center gap-3">
             <Link to={relationshipOnly ? '/entity-activities' : '/dashboard'} className="text-2xl text-police-300 hover:text-accent-cyan" aria-label="Back" title="Back">
-              ←
+              â†
             </Link>
             <h1 className="text-2xl font-bold text-gradient">{relationshipOnly ? 'Relationship Entry' : 'Entity Records'}</h1>
           </div>
@@ -362,7 +363,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
                       <td className="p-3 text-accent-cyan">{row.username || <span className="text-police-500">no login set</span>}{row.id === user?.id && <span className="ml-2 rounded bg-accent-cyan/10 px-2 py-0.5 text-xs text-accent-cyan">You</span>}</td>
                       <td className="p-3 text-white">{row.name}<div className="text-xs text-police-500">{row.rank || ''} {row.email}</div></td>
                       <td className="p-3 text-police-300">{row.role}</td>
-                      <td className="p-3 text-police-300">{row.department || <span className="text-police-500">—</span>}</td>
+                      <td className="p-3 text-police-300">{row.department || <span className="text-police-500">â€”</span>}</td>
                       <td className="p-3 text-police-300">Active</td>
                       <td className="p-3">
                         <button type="button" className="mr-3 text-accent-cyan" onClick={() => setUserForm({
@@ -523,7 +524,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
                 <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-police-800 py-3">
                   <div className="text-sm">
                     <span className="text-white font-medium">{row.sourceLabel || row.sourceId}</span>
-                    <span className="mx-2 text-police-500">—{row.type.replace(/_/g, ' ')} ({row.confidence}%)→</span>
+                    <span className="mx-2 text-police-500">â€”{row.type.replace(/_/g, ' ')} ({row.confidence}%)â†’</span>
                     <span className="text-white font-medium">{row.targetLabel || row.targetId}</span>
                   </div>
                   <div className="flex gap-3 text-sm text-police-400">
@@ -563,7 +564,7 @@ export const SettingsPage = ({ mode = 'settings' }: { mode?: 'settings' | 'data'
                   aria-expanded={entityDropdownOpen}
                 >
                   <span>{caseData.entities.length ? `${caseData.entities.length} entities selected` : 'Select entities'}</span>
-                  <span aria-hidden="true">{entityDropdownOpen ? '▴' : '▾'}</span>
+                  <span aria-hidden="true">{entityDropdownOpen ? 'â–´' : 'â–¾'}</span>
                 </button>
                 {entityDropdownOpen && <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded border border-police-700 bg-police-900 p-2 shadow-xl">
                   <div className="mb-2 flex items-center justify-between border-b border-police-800 px-2 pb-2">
