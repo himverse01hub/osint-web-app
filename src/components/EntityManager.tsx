@@ -306,6 +306,9 @@ export const EntityManager = ({ onClose }: { onClose: () => void }) => {
                   <p className="truncate text-xs text-police-500">
                     {entity.value} • {entity.source.replace('_', ' ')} • {entity.confidence}% • {entity.verified ? 'Verified' : 'Unverified'}
                   </p>
+                  <p className="truncate text-xs text-police-600" title={entity.discoveredAt ? new Date(entity.discoveredAt).toISOString() : undefined}>
+                    Added: {entity.discoveredAt ? new Date(entity.discoveredAt).toLocaleString() : '—'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => startEdit(entity)} className="btn-secondary px-3 py-1 text-xs">Edit</button>

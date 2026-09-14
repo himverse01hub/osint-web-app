@@ -234,7 +234,7 @@ export const CasesPage = () => {
                           <td><Link to={`/case/${caseItem.id}`} className="font-semibold text-white hover:text-accent-cyan">{caseItem.caseNumber}</Link><p className="text-xs text-police-500">{caseItem.title}</p></td>
                           <td><span className="badge badge-info capitalize">{caseItem.status}</span></td>
                           <td><span className={`badge capitalize ${caseItem.priority === 'critical' ? 'badge-danger' : caseItem.priority === 'high' ? 'badge-warning' : 'badge-primary'}`}>{caseItem.priority}</span></td>
-                          <td className="text-sm text-police-400">{new Date(caseItem.updatedAt).toLocaleDateString()}</td>
+                          <td className="text-sm text-police-400" title={new Date(caseItem.updatedAt).toISOString()}>{new Date(caseItem.updatedAt).toLocaleString()}</td>
                           <td><div className="flex justify-end gap-2"><button onClick={() => openEdit(caseItem)} className="btn-secondary px-3 py-1.5 text-sm">Edit</button><button onClick={() => void removeCase(caseItem)} className="btn-danger px-3 py-1.5 text-sm">Remove</button></div></td>
                         </tr>
                       ))}

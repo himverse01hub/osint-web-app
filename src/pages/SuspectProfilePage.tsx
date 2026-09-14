@@ -154,7 +154,7 @@ const OverviewTab = ({ entity, relationships }: { entity: any; relationships: an
                 <span className="text-police-300 text-sm">Source: {entity.sourceName}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-police-300 text-sm">Discovered: {new Date(entity.discoveredAt).toLocaleDateString()}</span>
+                <span className="text-police-300 text-sm" title={new Date(entity.discoveredAt).toISOString()}>Discovered: {new Date(entity.discoveredAt).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -567,7 +567,7 @@ const ActivityTab = ({ entity, relationships }: { entity: any; relationships: an
                 <div className="flex-1">
                   <h4 className="font-medium text-white">{rel.description}</h4>
                   <p className="text-police-400 text-sm">
-                    Strength: {rel.strength}% • Confidence: {rel.confidence}% • {new Date(rel.discoveredAt).toLocaleDateString()}
+                    Strength: {rel.strength}% • Confidence: {rel.confidence}% • {new Date(rel.discoveredAt).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -584,7 +584,7 @@ const ActivityTab = ({ entity, relationships }: { entity: any; relationships: an
             <div className="flex-1">
               <h4 className="font-medium text-white">Entity Discovered</h4>
               <p className="text-police-400 text-sm">
-                {entity.sourceName} identified this entity on {new Date(entity.discoveredAt).toLocaleDateString()}
+                {entity.sourceName} identified this entity on {new Date(entity.discoveredAt).toLocaleString()}
               </p>
             </div>
           </div>

@@ -260,9 +260,9 @@ export const DashboardPage = () => {
                 </div>
               ) : drilldownRows.length ? drilldownRows.slice(0, 10).map((row: any) => (
                 <div key={row.id} className="rounded-lg border border-police-800 bg-police-950/40 p-3">
-                  {activeDrilldown === 'cases' && <><p className="font-medium text-white">{row.caseNumber} · {row.title}</p><p className="text-sm capitalize text-police-400">{row.status} · {row.priority} priority</p></>}
-                  {activeDrilldown === 'alerts' && <><p className="font-medium text-white">{row.title}</p><p className="text-sm text-police-400">{row.description || 'No description'} · {row.severity} severity</p></>}
-                  {activeDrilldown === 'entities' && <><p className="font-medium text-white">{row.label || row.value}</p><p className="text-sm capitalize text-police-400">{row.type?.replace('_', ' ')} · {row.value}</p></>}
+                  {activeDrilldown === 'cases' && <><p className="font-medium text-white">{row.caseNumber} · {row.title}</p><p className="text-sm capitalize text-police-400">{row.status} · {row.priority} priority</p>{row.updatedAt && <p className="text-xs text-police-500">Updated: {new Date(row.updatedAt).toLocaleString()}</p>}</>}
+                  {activeDrilldown === 'alerts' && <><p className="font-medium text-white">{row.title}</p><p className="text-sm text-police-400">{row.description || 'No description'} · {row.severity} severity</p>{row.createdAt && <p className="text-xs text-police-500">Created: {new Date(row.createdAt).toLocaleString()}</p>}</>}
+                  {activeDrilldown === 'entities' && <><p className="font-medium text-white">{row.label || row.value}</p><p className="text-sm capitalize text-police-400">{row.type?.replace('_', ' ')} · {row.value}</p>{row.discoveredAt && <p className="text-xs text-police-500">Added: {new Date(row.discoveredAt).toLocaleString()}</p>}</>}
                 </div>
               )) : <p className="py-8 text-center text-police-500">No related data available yet.</p>}
             </div>

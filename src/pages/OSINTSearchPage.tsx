@@ -192,7 +192,7 @@ export const OSINTSearchPage = () => {
       e.label,
       e.confidence,
       e.sourceName,
-      new Date(e.discoveredAt).toLocaleDateString(),
+      new Date(e.discoveredAt).toLocaleString(),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map((c: string) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
     const slug = String(results?.query?.value ?? searchValue).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'search';
@@ -379,8 +379,8 @@ export const OSINTSearchPage = () => {
               <p className="text-police-400 text-sm font-medium mb-2">Recent</p>
               <div className="flex flex-wrap gap-2">
                 {recentSearches.slice(0, 8).map((s, i) => (
-                  <button key={`${s.query}-${s.type}-${i}`} onClick={() => { setSearchType(s.type); setSearchValue(s.query); }} className="px-3 py-1 rounded-full text-xs bg-police-800 text-police-300 hover:bg-police-700">
-                    {s.query} ({s.count})
+                  <button key={`${s.query}-${s.type}-${i}`} title={`Searched: ${new Date(s.timestamp).toLocaleString()}`} onClick={() => { setSearchType(s.type); setSearchValue(s.query); }} className="px-3 py-1 rounded-full text-xs bg-police-800 text-police-300 hover:bg-police-700">
+                    {s.query} ({s.count}) • {new Date(s.timestamp).toLocaleString()}
                   </button>
                 ))}
               </div>
@@ -578,8 +578,8 @@ export const OSINTSearchPage = () => {
                         </div>
                       </div>
                       <p className="text-police-400 text-sm">
-                        Source: {entity.sourceName} • 
-                        {new Date(entity.discoveredAt).toLocaleDateString()}
+                          Source: {entity.sourceName} •
+                          <span title={new Date(entity.discoveredAt).toISOString()}>{new Date(entity.discoveredAt).toLocaleString()}</span>
                       </p>
                       {entity.type === 'person' && (
                         <div className="mt-2 space-y-1 text-police-400 text-sm">

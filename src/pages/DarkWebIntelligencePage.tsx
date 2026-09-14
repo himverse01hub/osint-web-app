@@ -291,7 +291,7 @@ export const DarkWebIntelligencePage = () => {
                     <h4 className="font-medium text-white">{mention.listingTitle}</h4>
                     <p className="text-police-400 text-sm">
                       Marketplace: {mention.marketPlace} •
-                      {mention.datePosted ? new Date(mention.datePosted).toLocaleDateString() : 'Date not available'}
+                      {mention.datePosted ? new Date(mention.datePosted).toLocaleString() : 'Date not available'}
                     </p>
                   </div>
                 </div>

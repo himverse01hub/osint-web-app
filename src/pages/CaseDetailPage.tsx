@@ -314,7 +314,7 @@ export const CaseDetailPage = () => {
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium text-white">{file.fileName}</p>
                   <p className="text-xs text-police-500">
-                    {(file.sizeBytes / 1024).toFixed(1)} KB • {new Date(file.createdAt).toLocaleDateString()}
+                    {(file.sizeBytes / 1024).toFixed(1)} KB • {new Date(file.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <button
