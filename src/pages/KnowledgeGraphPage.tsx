@@ -439,6 +439,13 @@ export const KnowledgeGraphPage = () => {
     }
   }, []);
 
+  const handleZoomTo = useCallback((scale: number) => {
+    if (svgRef.current && zoomRef.current) {
+      const clamped = Math.min(4, Math.max(0.1, scale));
+      select(svgRef.current).transition().duration(200).call(zoomRef.current.scaleTo, clamped);
+    }
+  }, []);
+
   const handleFullscreen = useCallback(() => {
     const container = document.getElementById('graph-container');
     if (container) {
@@ -452,8 +459,18 @@ export const KnowledgeGraphPage = () => {
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+        setSelectedNode(null);
+      }
+    };
     document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   if (loading) {
@@ -589,15 +606,25 @@ export const KnowledgeGraphPage = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between bg-police-900/50 rounded-lg p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-police-900/50 rounded-lg p-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-police-500">Node size reflects connection count</span>
           <span className="text-sm text-police-500">|</span>
           <span className="text-sm text-police-500">Zoom: {(transform.k * 100).toFixed(0)}%</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={handleZoomIn} className="btn-secondary px-3 py-1.5 text-sm">Zoom In</button>
-          <button type="button" onClick={handleZoomOut} className="btn-secondary px-3 py-1.5 text-sm">Zoom Out</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={handleZoomOut} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Zoom out manually">− Zoom Out</button>
+          <input
+            type="range"
+            min={0.1}
+            max={4}
+            step={0.1}
+            value={Number(transform.k.toFixed(1))}
+            onChange={(e) => handleZoomTo(Number(e.target.value))}
+            className="w-40 accent-cyan-400"
+            aria-label="Manual zoom slider"
+          />
+          <button type="button" onClick={handleZoomIn} className="btn-secondary px-3 py-1.5 text-sm" aria-label="Zoom in manually">+ Zoom In</button>
           <button type="button" onClick={handleZoomReset} className="btn-secondary px-3 py-1.5 text-sm">Reset</button>
         </div>
       </div>
@@ -809,60 +836,111 @@ export const KnowledgeGraphPage = () => {
         </div>
       </div>
 
-      {selectedNode && (
-        <div className="card card-hover p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <svg width="24" height="24" viewBox="-7 -7 14 14">
-                <path
-                  d={getShapePath(TYPE_SHAPES[selectedNode.type] || 'circle', 6)}
-                  fill={selectedNode.color}
-                  fillOpacity="0.2"
-                  stroke={selectedNode.color}
-                  strokeWidth="1.5"
-                />
-              </svg>
-              <h3 className="text-lg font-semibold text-white">{selectedNode.label}</h3>
-            </div>
-            <button
-              onClick={() => navigate(`/profile/${encodeURIComponent(selectedNode.id)}`)}
-              className="text-sm text-police-400 hover:text-police-300"
-            >
-              View Profile
-            </button>
+      {selectedNode && (() => {
+        const peerId = (ref: any) => (typeof ref === 'object' && ref !== null ? ref.id : ref);
+        const neighbors = edges
+          .filter((e: any) => peerId(e.source) === selectedNode.id || peerId(e.target) === selectedNode.id)
+          .slice(0, 8)
+          .map((e: any) => {
+            const otherId = peerId(e.source) === selectedNode.id ? peerId(e.target) : peerId(e.source);
+            return { edge: e, node: nodes.find((n: any) => n.id === otherId) };
+          });
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={() => setSelectedNode(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Details for ${selectedNode.label}`}
+          >
+            <section className="card max-h-[85vh] w-full max-w-lg overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <svg width="32" height="32" viewBox="-8 -8 16 16" aria-hidden="true">
+                    <path
+                      d={getShapePath(TYPE_SHAPES[selectedNode.type] || 'circle', 7)}
+                      fill={selectedNode.color}
+                      fillOpacity="0.2"
+                      stroke={selectedNode.color}
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">{selectedNode.label}</h3>
+                    <p className="text-xs capitalize text-police-400">
+                      {String(selectedNode.type).replace('_', ' ')}
+                      {selectedNode.verified ? ' • Verified' : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedNode(null)}
+                  className="text-police-400 hover:text-white text-xl leading-none px-2"
+                  aria-label="Close node details"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-police-800/50 p-3">
+                  <p className="text-xs text-police-400">Node ID</p>
+                  <p className="mt-1 break-all font-medium text-white">{selectedNode.id}</p>
+                </div>
+                <div className="rounded-lg bg-police-800/50 p-3">
+                  <p className="text-xs text-police-400">Connections</p>
+                  <p className="mt-1 font-medium text-white">{selectedNode.connections ?? neighbors.length}</p>
+                </div>
+                <div className="rounded-lg bg-police-800/50 p-3">
+                  <p className="text-xs text-police-400">Confidence</p>
+                  <p className="mt-1 font-medium text-white">{selectedNode.confidence != null ? `${selectedNode.confidence}%` : '—'}</p>
+                </div>
+                <div className="rounded-lg bg-police-800/50 p-3">
+                  <p className="text-xs text-police-400">Source</p>
+                  <p className="mt-1 font-medium text-white">{selectedNode.sourceName || selectedNode.source || '—'}</p>
+                </div>
+                {selectedNode.discoveredAt && (
+                  <div className="col-span-2 rounded-lg bg-police-800/50 p-3">
+                    <p className="text-xs text-police-400">Discovered</p>
+                    <p className="mt-1 font-medium text-white">{new Date(selectedNode.discoveredAt).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4">
+                <p className="mb-2 text-sm font-medium text-white">Linked nodes ({neighbors.length}{edges.length > 8 ? ' shown of more' : ''})</p>
+                {neighbors.length ? (
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {neighbors.map(({ edge, node }: any, i: number) => (
+                      <button
+                        key={edge.id || i}
+                        type="button"
+                        onClick={() => node && handleNodeClick(node.id)}
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-police-800 bg-police-950/40 p-2 text-left hover:bg-police-800/50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-white">{node?.label || 'Unknown node'}</span>
+                          <span className="block truncate text-xs capitalize text-police-400">{String(edge.label || edge.type || '').replace('_', ' ')}</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-police-400">{edge.confidence != null ? `${edge.confidence}%` : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-police-500">No linked nodes in the current view.</p>
+                )}
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => handleExpandNode(selectedNode.id)} className="btn-secondary px-4 py-2 text-sm">Expand Node</button>
+                <button type="button" onClick={() => handleViewProfile(selectedNode.id)} className="btn-secondary px-4 py-2 text-sm">View Profile</button>
+                <button type="button" onClick={() => setSelectedNode(null)} className="btn-primary px-4 py-2 text-sm">Close</button>
+              </div>
+            </section>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedNode.color }}></div>
-              <div>
-                <p className="text-police-400 text-xs">Type</p>
-                <p className="text-white font-medium capitalize">{selectedNode.type.replace('_', ' ')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-accent-cyan"></div>
-              <div>
-                <p className="text-police-400 text-xs">Connections</p>
-                <p className="text-white font-medium">{selectedNode.connections}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-police-600/50"></div>
-              <div>
-                <p className="text-police-400 text-xs">Size Score</p>
-                <p className="text-white font-medium">{selectedNode.size}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-accent-gold"></div>
-              <div>
-                <p className="text-police-400 text-xs">Zoom Level</p>
-                <p className="text-white font-medium">{(transform.k * 100).toFixed(0)}%</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {contextMenu && (
         <div
